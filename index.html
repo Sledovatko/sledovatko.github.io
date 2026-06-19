@@ -1,0 +1,2336 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sledovátko</title>
+<style>
+/* ═══════════════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* ── DARK GOLD CINEMA palette ──
+     Very dark warm-noir base, warm bronze/charcoal surfaces, luminous gold accent
+     with a deep amber secondary. Existing var NAMES kept (JS & js/ rely on them). */
+  --bg:#0A0A0C;--surface:#15120D;--surface2:#211B12;
+  --accent:#FFC233;--accent2:#F5A623;
+  --text:#F4ECDD;--text2:#B8A98C;--text3:#7A6E58;
+  --border:#332A1C;--radius:10px;--card-w:120px;
+  --gold:#FFC233;--purple:#F5A623;--blue:#E0902A;--red:#FF5A52;
+  --modal-bg:rgba(0,0,0,.72);
+  /* Interactive color tokens — drive the "colors react to interaction" behaviour */
+  --accent-rgb:255,194,51;--accent2-rgb:245,166,35;
+  --accent-hover:#FFD15C;--accent-active:#E8A91E;
+  --accent-glow:rgba(255,194,51,.45);--accent2-glow:rgba(245,166,35,.42);
+  --focus-ring:rgba(255,194,51,.55);
+  --grad-accent:linear-gradient(120deg,var(--accent),var(--accent2));
+}
+[data-theme="light"]{
+  --bg:#F4F0E8;--surface:#FFFFFF;--surface2:#F0E9DA;
+  --accent:#C58800;--accent2:#A66A00;
+  --text:#241D10;--text2:#5C5238;--text3:#938868;
+  --border:#E2D8C4;
+  --gold:#C58800;--red:#D6433B;
+  --accent-rgb:197,136,0;--accent2-rgb:166,106,0;
+  --accent-hover:#E0A11A;--accent-active:#A87400;
+  --accent-glow:rgba(197,136,0,.38);--accent2-glow:rgba(166,106,0,.32);
+  --focus-ring:rgba(197,136,0,.5);
+}
+/* Native dropdowns: dark surface + light text so options are always legible */
+select,option{background:var(--surface)!important;color:var(--text)!important}
+select option{background:var(--surface2)}
+[data-theme="light"] select,[data-theme="light"] option{background:#fff!important;color:var(--text)!important}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5;overflow:hidden}
+body{display:flex;flex-direction:column}
+button{cursor:pointer;font-family:inherit;font-size:inherit;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;width:100%;outline:none;transition:border-color .2s}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px}
+a{color:var(--accent);text-decoration:none}
+img{display:block;max-width:100%}
+
+/* ═══════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════ */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden}
+#screen::-webkit-scrollbar{width:5px}
+#screen::-webkit-scrollbar-track{background:transparent}
+#screen::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ── Bottom nav ── */
+#bottom-nav{display:flex;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 0;color:var(--text2);transition:color .15s;position:relative;font-size:11px}
+.nav-btn.active{color:var(--accent)}
+.nav-btn__icon{font-size:22px;line-height:1}
+.nav-btn__badge{position:absolute;top:6px;right:calc(50% - 20px);background:var(--accent);color:#000;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px;min-width:16px;text-align:center}
+
+/* ═══════════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════════ */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius);font-weight:600;transition:all .15s;white-space:nowrap;cursor:pointer}
+.btn--primary{background:var(--accent);color:#000}
+.btn--primary:hover{filter:brightness(1.1)}
+.btn--ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn--ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn--success{background:#2e7d32;color:#fff}
+.btn--success:hover{background:#388e3c}
+.btn--danger{background:#c62828;color:#fff}
+.btn--sm{padding:5px 10px;font-size:12px}
+.btn--icon{width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface2)}
+.btn--icon:hover{background:var(--accent);color:#000}
+
+/* ═══════════════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════════════ */
+.movie-card{width:var(--card-w);flex-shrink:0;cursor:pointer;transition:transform .16s}
+.movie-card:hover{transform:scale(1.04);transform-origin:top center}
+.movie-card__poster-wrap{position:relative;width:100%;padding-bottom:150%;border-radius:var(--radius);overflow:hidden;background:var(--surface2)}
+.movie-card__poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.movie-card__placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text3)}
+.movie-card__watched-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(27,94,32,.55),transparent);pointer-events:none}
+.movie-card__watched-badge{position:absolute;top:6px;left:6px;background:#388e3c;border-radius:6px;padding:3px 5px;font-size:10px;font-weight:700;color:#fff}
+.movie-card__watched-toggle--unseen{opacity:0;transition:opacity .15s}
+.movie-card:hover .movie-card__watched-toggle--unseen{opacity:1}
+.movie-card__watched-toggle{transition:background .15s,color .15s,opacity .15s}
+.movie-card__watched-toggle:hover{filter:brightness(1.2) !important}
+.movie-card__label-bar{display:none}/* replaced by label-strip */
+/* bookmark removed - quick-add button sufficient */
+.movie-card__date-badge{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.78);border-radius:6px;padding:2px 6px;font-size:9px;font-weight:700;color:#fff}
+.movie-card__hover-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 40%);opacity:0;transition:opacity .2s;display:flex;align-items:flex-end;padding:8px}
+.movie-card:hover .movie-card__hover-overlay{opacity:1}
+.movie-card__trailer-hint{position:absolute;top:0;left:0;right:0;background:rgba(0,0,0,.78);text-align:center;padding:5px;font-size:11px;font-weight:600;color:#fff;opacity:0;transition:opacity .2s;pointer-events:none}
+.movie-card__trailer-hint.visible{opacity:1;pointer-events:all}
+.card--spotlight{z-index:20;position:relative}
+.card--spotlight::after{content:'';position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:-1;pointer-events:none}
+.mini-trailer-box{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:calc(var(--card-w)*3 + 24px);max-width:400px;min-width:220px;height:160px;background:#000;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.7);z-index:50;overflow:hidden}
+.btn--quick-add{flex:1;padding:5px;font-size:11px;font-weight:600;border-radius:8px;background:rgba(0,201,167,.9);color:#000;text-align:center;transition:background .35s ease,color .35s ease}
+.btn--quick-add.active{background:rgba(56,142,60,.9);color:#fff}
+.btn--quick-add.active:hover{background:rgba(198,40,40,.88);color:#fff}
+.movie-card__title{font-size:11px;font-weight:600;line-height:1.35;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:30px}
+.movie-card__meta{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);margin-top:3px;min-height:16px}
+.movie-card__year{color:var(--text3)}
+.movie-card__rating{margin-left:auto;color:#FFB300;font-weight:600}
+.movie-card__rating .soon{color:var(--accent)}
+.movie-card__rating .no-rating{color:var(--text3)}
+.personal-rating{margin-left:4px;color:var(--accent);font-size:9px}
+mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-radius:2px}
+
+/* ═══════════════════════════════════════════════════
+   CATEGORY ROW
+═══════════════════════════════════════════════════ */
+.category{margin-bottom:4px}
+.category__header{display:flex;align-items:center;gap:8px;padding:20px 20px 10px}
+.category__accent{width:3px;height:18px;border-radius:2px;flex-shrink:0}
+.category__title{font-size:16px;font-weight:700;flex:1}
+.category__collapse{background:none;border:none;color:var(--text3);font-size:14px;padding:4px}
+.category__body{transition:max-height .3s}
+.category__body.collapsed .category__scroll-wrap,.category__body.collapsed .category__dots{display:none}
+.category__scroll-wrap{position:relative}
+/* TASK 1 FIX: vertical padding gives the scaled card (translateY(-9px) scale(1.05))
+   and its glow shadow room to breathe — never clipped by overflow-y:hidden and never
+   tucked under the header. Cards visibly sit lower, away from the title. */
+.category__row{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:20px 20px 26px;scrollbar-width:none}
+.category__row::-webkit-scrollbar{display:none}
+/* Arrow centered on the row via 50% (robust to the new padding) instead of a hardcoded top. */
+.category__arrow{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.7);border:1.5px solid rgba(255,255,255,.25);color:#fff;display:flex;align-items:center;justify-content:center;z-index:5;opacity:0;transition:opacity .2s,background .18s var(--ease-spring),transform .18s var(--ease-spring),box-shadow .2s,color .15s,border-color .15s;cursor:pointer}
+.category__arrow--left{left:8px}
+.category__arrow--right{right:8px}
+.category__arrow:hover{background:rgba(0,201,167,.35);border-color:var(--accent);color:var(--accent);transform:translateY(-50%) scale(1.12);box-shadow:0 6px 20px rgba(0,201,167,.4)}
+.category__arrow:active{transform:translateY(-50%) scale(.94)}
+.category__arrow:focus-visible{outline:none;border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 3px var(--focus-ring)}
+.category__dots{display:flex;justify-content:center;gap:4px;padding:4px 0 8px}
+.dot{height:4px;border-radius:2px;background:var(--border);transition:all .2s;width:6px}
+.dot.active{width:16px;background:var(--accent)}
+
+/* ═══════════════════════════════════════════════════
+   GRID (search/favorites)
+═══════════════════════════════════════════════════ */
+.movie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px 12px;padding:16px}
+
+/* ═══════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════ */
+.modal-overlay{position:fixed;inset:0;background:var(--modal-bg);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;padding:16px}
+.modal-overlay.show{opacity:1}
+.modal{background:var(--surface);border-radius:16px;width:100%;max-width:500px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;transform:translateY(12px);transition:transform .2s}
+.modal-overlay.show .modal{transform:translateY(0)}
+.modal--wide{max-width:750px}
+.modal--tall{max-height:95vh}
+.modal-header{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-header h3{flex:1;font-size:16px;font-weight:700}
+.modal-close{font-size:18px;color:var(--text2);padding:4px 8px;border-radius:6px}
+.modal-close:hover{background:var(--surface2);color:var(--text)}
+.modal-body{overflow-y:auto;flex:1}
+
+/* ── Detail Modal ── */
+.detail-hero{background:var(--surface2);background-size:cover;background-position:center;position:relative;min-height:180px}
+.detail-hero__gradient{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(5,10,18,.55) 0%,rgba(5,10,18,.92) 100%),linear-gradient(to right,rgba(5,10,18,.98) 30%,rgba(5,10,18,.4))}
+.detail-hero__content{position:relative;display:flex;gap:16px;padding:20px}
+.detail-poster{width:90px;height:135px;object-fit:cover;border-radius:8px;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.detail-info{flex:1;display:flex;flex-direction:column;gap:8px;justify-content:flex-end}
+.detail-title{font-size:18px;font-weight:800;line-height:1.2;cursor:pointer;color:#fff}
+.detail-title:hover{color:var(--accent)}
+.detail-meta{display:flex;gap:10px;color:rgba(255,255,255,.7);font-size:13px;flex-wrap:wrap}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap}
+.detail-actions .btn--ghost{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.9)}
+.detail-actions .btn--ghost:hover{border-color:var(--accent);color:var(--accent)}
+.detail-actions .btn--primary{background:var(--accent);color:#1a1206}
+.detail-actions .btn--success{background:#2e7d32;color:#fff}
+.detail-body{padding:0 20px 20px}
+.detail-section{padding-top:20px}
+.detail-section h3{font-size:13px;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.detail-overview{color:var(--text2);line-height:1.6;font-size:13px}
+.detail-comment{min-height:70px}
+.rating-buttons{display:flex;flex-wrap:wrap;gap:6px}
+.rating-btn{width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-weight:700;font-size:13px;transition:all .15s;color:var(--text2)}
+.rating-btn:hover,.rating-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
+.rating-btn--clear{width:auto;padding:0 10px;background:var(--surface2);border-color:var(--border);color:var(--red)}
+.badge{background:var(--accent2);color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
+
+/* gallery styles moved to action-btns-row block above */
+
+/* ═══════════════════════════════════════════════════
+   HOME SCREEN
+═══════════════════════════════════════════════════ */
+.home-header{display:flex;align-items:center;gap:10px;padding:18px 20px 0}
+.home-logo{font-size:24px;font-weight:800;flex:1}
+.home-logo span{color:var(--accent)}
+.home-greeting{font-size:12px;color:var(--text3);padding:4px 20px 0}
+.home-stats-chip{background:rgba(0,201,167,.12);color:var(--accent);border-radius:10px;padding:4px 10px;font-size:11px;font-weight:600}
+.icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);font-size:18px;transition:background .15s}
+.icon-btn:hover{background:rgba(0,201,167,.15)}
+
+/* Mood picker */
+.mood-section{padding:14px 20px 0}
+.mood-label{font-size:12px;color:var(--text3);margin-bottom:8px}
+.mood-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.mood-chips::-webkit-scrollbar{display:none}
+.mood-chip{flex-shrink:0;padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;cursor:pointer;border:1px solid transparent}
+.mood-chip:hover,.mood-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+
+/* Daily movie */
+.daily-card{margin:16px 20px 0;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;min-height:110px;background:var(--surface2);transition:filter .2s}
+.daily-card:hover{filter:brightness(1.08)}
+.daily-card__bg{position:absolute;inset:0;object-fit:cover;width:100%;height:100%;opacity:.45}
+.daily-card__content{position:relative;display:flex;align-items:center;gap:14px;padding:14px 16px}
+.daily-card__poster{width:50px;height:75px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.daily-card__label{font-size:11px;color:#FFB300;font-weight:700}
+.daily-card__title{font-size:16px;font-weight:800}
+.daily-card__sub{font-size:12px;color:var(--text2)}
+
+/* Bored button */
+.bored-btn{margin:12px 20px 0;border-radius:14px;padding:14px 16px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02)}
+.bored-btn:hover{border-color:var(--accent);background:rgba(0,201,167,.08)}
+.bored-btn__emoji{font-size:22px}
+.bored-btn__text{flex:1}
+.bored-btn__title{font-size:14px;font-weight:800}
+.bored-btn__sub{font-size:12px;color:var(--text2)}
+.bored-btn__arrow{color:var(--text3);font-size:14px}
+
+/* ═══════════════════════════════════════════════════
+   SEARCH SCREEN
+═══════════════════════════════════════════════════ */
+.search-header{padding:16px 16px 0;position:sticky;top:0;background:var(--bg);z-index:10}
+.search-bar-row{display:flex;gap:8px;margin-bottom:8px}
+.search-input-wrap{flex:1;min-width:80px;position:relative}
+.search-input-wrap input{padding-left:38px;padding-right:32px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;pointer-events:none;z-index:3;filter:none!important}
+.search-input-wrap input{position:relative;z-index:1}
+.search-clear{z-index:3}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;display:none;cursor:pointer;background:none;border:none;padding:4px;line-height:1;z-index:2}
+.search-clear.visible{display:block}
+.search-clear:hover{color:var(--text)}
+.filter-toggle{position:relative}
+.filter-toggle.active{color:var(--accent)}
+.filter-panel{background:var(--surface);border-radius:12px;padding:14px;margin-bottom:10px;display:none}
+.filter-panel.open{display:block}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.filter-label{font-size:12px;color:var(--text2);min-width:90px}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+.filter-chip{padding:4px 10px;border-radius:14px;background:var(--surface2);font-size:11px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text2)}
+.filter-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.range-row{display:flex;gap:8px;align-items:center}
+.range-row input[type="range"]{flex:1;accent-color:var(--accent);height:4px}
+.range-val{font-size:12px;color:var(--accent);min-width:36px;text-align:right}
+.sort-select{padding:6px 10px;border-radius:8px;font-size:12px;background:var(--surface2);border:1px solid var(--border)}
+
+/* History */
+.history-section{padding:0 16px 10px}
+.history-label{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.history-label button{font-size:11px;color:var(--accent);margin-left:auto}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text2)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip__star{font-size:11px;color:var(--text3)}
+.chip__star.saved{color:#FFB300}
+
+/* Genre keyboard */
+.genre-keyboard{padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px}
+.genre-btn{background:rgba(255,255,255,.04);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;gap:4px}
+.genre-btn:hover{border-color:var(--accent);background:rgba(0,201,167,.1)}
+.genre-btn__emoji{font-size:22px}
+.genre-btn__name{font-size:11px;font-weight:600;color:var(--text2)}
+
+/* Search bulk toolbar */
+.bulk-toolbar{padding:8px 16px;display:flex;align-items:center;gap:10px;background:var(--surface);border-bottom:1px solid var(--border)}
+.bulk-toolbar.hidden{display:none}
+
+/* Empty / tip */
+.tip-card{margin:12px 16px;padding:12px;background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.2);border-radius:12px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.tip-card__poster{width:36px;height:54px;object-fit:cover;border-radius:6px;flex-shrink:0}
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state__icon{font-size:56px;margin-bottom:14px}
+.empty-state__title{font-size:16px;font-weight:700;margin-bottom:6px}
+.empty-state__sub{color:var(--text2);margin-bottom:16px}
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+.suggestion{padding:8px 16px;border-radius:20px;background:rgba(0,201,167,.12);color:var(--accent);font-weight:600;cursor:pointer}
+.suggestion:hover{background:rgba(0,201,167,.25)}
+
+/* ═══════════════════════════════════════════════════
+   FAVORITES SCREEN
+═══════════════════════════════════════════════════ */
+.favs-header{padding:16px 16px 0;position:sticky;top:0;background:var(--bg);z-index:10}
+.favs-toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;flex-wrap:wrap}
+.progress-bar-wrap{padding:0 16px 8px}
+.progress-bar-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:var(--text2)}
+.progress-bar{height:6px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden}
+.progress-bar__fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+
+/* Stats panel */
+.stats-panel{margin:0 16px 10px;background:rgba(0,201,167,.06);border:1px solid rgba(0,201,167,.15);border-radius:14px;padding:14px;display:none}
+.stats-panel.open{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat-item__val{font-size:20px;font-weight:800;color:var(--accent)}
+.stat-item__label{font-size:10px;color:var(--text3)}
+
+/* Collections */
+.collections-row{padding:0 16px 8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.collections-row::-webkit-scrollbar{display:none}
+.col-chip{flex-shrink:0;padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text2);display:flex;align-items:center;gap:5px}
+.col-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.col-chip__del{font-size:11px;opacity:.6;display:none}
+.col-chip:hover .col-chip__del{display:inline}
+
+/* Labels filter */
+.labels-row{padding:0 16px 6px;display:flex;gap:6px;flex-wrap:wrap}
+.label-filter{padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+
+/* Card grid with context menu */
+.movie-card-wrap{position:relative}
+.card-menu-btn{position:absolute;bottom:46px;right:0;background:rgba(0,0,0,.65);border-radius:6px 0 0 0;padding:4px 6px;font-size:11px;color:rgba(255,255,255,.6);display:none;cursor:pointer;z-index:2}
+.movie-card-wrap:hover .card-menu-btn{display:block}
+.card-menu-btn:hover{color:#fff}
+/* FIX #9: similar button replaces the ✨ card-menu-btn in search */
+.similar-btn{position:absolute;bottom:46px;left:0;background:rgba(0,0,0,.65);border-radius:0 6px 0 0;padding:4px 7px;font-size:11px;color:rgba(255,255,255,.55);display:none;cursor:pointer;z-index:2}
+.movie-card-wrap:hover .similar-btn{display:block}
+.similar-btn:hover{color:#fff}
+
+/* Context menu */
+.ctx-menu{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:160px}
+.ctx-menu-item{padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.ctx-menu-item:hover{background:var(--surface2)}
+
+/* Calendar view */
+.calendar-view{padding:16px}
+.cal-year{font-size:28px;font-weight:900;color:var(--accent);margin:12px 0 8px}
+.cal-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px}
+.cal-row::-webkit-scrollbar{display:none}
+
+/* ═══════════════════════════════════════════════════
+   BORED SCREEN
+═══════════════════════════════════════════════════ */
+.bored-screen{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.bored-topbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.bored-topbar__title{font-size:16px;font-weight:800;flex:1}
+.bored-topbar__title span{color:var(--accent)}
+.bored-filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:8px 10px;flex-shrink:0}
+.bored-filters::-webkit-scrollbar{display:none}
+.bored-filter{flex-shrink:0;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,.06);font-size:11px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text2)}
+.bored-filter:hover,.bored-filter.active{background:var(--accent);color:#000}
+.bored-canvas-wrap{flex:1;position:relative;overflow:hidden}
+#bored-canvas{width:100%;height:100%;display:block;cursor:crosshair;image-rendering:auto}
+
+/* ═══════════════════════════════════════════════════
+   HOT OR NOT
+═══════════════════════════════════════════════════ */
+.hon-screen{display:flex;flex-direction:column;height:100%;background:var(--bg)}
+.hon-progress{height:3px;background:rgba(255,255,255,.1);flex-shrink:0}
+.hon-progress__fill{height:100%;background:var(--accent);transition:width .3s}
+.hon-card-area{flex:1;display:flex;align-items:center;justify-content:center;padding:16px}
+.hon-card{width:100%;max-width:320px;border-radius:20px;overflow:hidden;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.5);aspect-ratio:.67;background:var(--surface2);cursor:pointer;transition:transform .3s}
+.hon-card.slide-right{transform:translateX(120%) rotate(15deg);opacity:0;transition:all .35s}
+.hon-card.slide-left{transform:translateX(-120%) rotate(-15deg);opacity:0;transition:all .35s}
+.hon-card__img{width:100%;height:100%;object-fit:cover;display:block}
+.hon-card__overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 50%);pointer-events:none}
+.hon-card__info{position:absolute;bottom:0;left:0;right:0;padding:16px}
+.hon-card__title{font-size:20px;font-weight:900;color:#fff;line-height:1.2}
+.hon-card__sub{font-size:14px;color:rgba(255,255,255,.65);margin-top:4px}
+.hon-card__overview{font-size:12px;color:rgba(255,255,255,.5);margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hon-verdict{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:80px;opacity:0;pointer-events:none;transition:opacity .15s}
+.hon-verdict.hot{background:rgba(0,200,100,.35)}
+.hon-verdict.skip{background:rgba(255,50,50,.35)}
+.hon-verdict.visible{opacity:1}
+.hon-btns{display:flex;align-items:center;justify-content:center;gap:20px;padding:16px 16px 20px;flex-shrink:0}
+.hon-btn{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.hon-btn__circle{border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:24px}
+.hon-btn__circle:hover{transform:scale(1.12)}
+.hon-btn--skip .hon-btn__circle{width:54px;height:54px;background:rgba(255,50,50,.15);color:#E53935}
+.hon-btn--detail .hon-btn__circle{width:40px;height:40px;background:rgba(255,255,255,.08);color:var(--text2);font-size:18px}
+.hon-btn--save .hon-btn__circle{width:54px;height:54px;background:var(--accent);color:#000}
+.hon-btn__label{font-size:11px;color:var(--text3);font-weight:600}
+.hon-done{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:24px}
+.hon-done__emoji{font-size:64px}
+.hon-done__title{font-size:24px;font-weight:900}
+.hon-done__picks{display:flex;gap:8px;overflow-x:auto;max-width:100%;padding:8px 0}
+.hon-done__picks img{width:80px;height:120px;object-fit:cover;border-radius:8px;flex-shrink:0}
+
+/* ═══════════════════════════════════════════════════
+   KINO VEČER
+═══════════════════════════════════════════════════ */
+.kv-screen{padding:20px}
+.kv-intro{background:rgba(0,201,167,.07);border:1px solid rgba(0,201,167,.2);border-radius:16px;padding:16px;margin-bottom:16px}
+.kv-theme{display:inline-flex;background:rgba(0,201,167,.15);color:var(--accent);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;margin-top:8px}
+.kv-anchor{font-size:11px;color:var(--text3);margin-top:6px}
+.kv-source-btns{display:flex;gap:10px;margin-bottom:16px}
+.kv-source-btn{flex:1;padding:10px;border-radius:12px;border:1px solid transparent;background:rgba(255,255,255,.04);font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;text-align:center}
+.kv-source-btn.active{border-color:var(--accent);background:rgba(0,201,167,.12);color:var(--accent)}
+.kv-movie-card{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.02);cursor:pointer;transition:all .15s;margin-bottom:12px}
+.kv-movie-card:hover{border-color:var(--accent);background:rgba(0,201,167,.06)}
+.kv-num{width:28px;height:28px;border-radius:50%;background:rgba(0,201,167,.15);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kv-time{font-size:9px;color:var(--text3);text-align:center;margin-top:2px}
+.kv-poster{width:48px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.kv-info{flex:1}
+.kv-slot{font-size:10px;color:var(--accent);font-weight:600}
+.kv-title{font-size:14px;font-weight:700;margin:2px 0}
+.kv-sub{font-size:12px;color:var(--text2)}
+.kv-actions{display:flex;gap:10px;margin-top:16px}
+
+/* ═══════════════════════════════════════════════════
+   SETUP SCREEN
+═══════════════════════════════════════════════════ */
+.setup-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.setup-card{background:var(--surface);border-radius:20px;padding:32px;max-width:460px;width:100%}
+.setup-logo{font-size:32px;font-weight:900;margin-bottom:8px}
+.setup-logo span{color:var(--accent)}
+.setup-sub{color:var(--text2);margin-bottom:24px;font-size:13px;line-height:1.6}
+.setup-steps{list-style:none;margin-bottom:20px}
+.setup-steps li{padding:6px 0;color:var(--text2);font-size:13px}
+.setup-steps li::before{content:'→ ';color:var(--accent)}
+.setup-input-row{display:flex;gap:8px}
+.setup-input-row input{flex:1}
+
+/* ═══════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════ */
+.spinner-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;gap:14px;color:var(--text2)}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes mini-fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.wm-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 18px;font-size:13px;font-weight:600;z-index:2000;opacity:0;transition:all .25s;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.wm-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.section-title{padding:20px 20px 10px;font-size:16px;font-weight:700}
+.divider{height:1px;background:var(--border);margin:0 16px}
+.input{width:100%}
+.hidden{display:none!important}
+.flex{display:flex}.items-center{align-items:center}.gap-8{gap:8px}.flex-1{flex:1}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media(max-width:600px){
+  :root{--card-w:105px}
+  .movie-grid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}
+  .detail-hero__content{flex-direction:column}
+}
+
+/* ── Action buttons row (Bored + Hot or Not side by side) ── */
+.action-btns-row{display:flex;gap:10px;margin:12px 20px 0}
+.action-btns-row .bored-btn{flex:1;margin:0}
+.hotnot-btn{border-color:rgba(255,100,50,.3)!important}
+.hotnot-btn:hover{border-color:#FF6D00!important;background:rgba(255,109,0,.08)!important}
+
+/* FIX #6: favorites ctx button — rides on top-right of card, matches card hover */
+.fav-ctx-btn{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:7px;
+  background:rgba(0,0,0,.72);color:rgba(255,255,255,.85);font-size:16px;
+  display:none;align-items:center;justify-content:center;z-index:3;
+  border:none;cursor:pointer;transition:background .15s;line-height:1}
+.movie-card:hover .fav-ctx-btn{display:flex}
+.fav-ctx-btn:hover{background:var(--accent);color:#000}
+
+/* FIX #7: label strip at bottom of poster */
+.movie-card__label-strip{position:absolute;bottom:0;left:0;right:0;height:4px}
+
+/* FIX #4: gallery arrows truly centered */
+.gallery-wrap{position:relative;display:flex;align-items:center;gap:4px}
+.gallery-arrow{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:rgba(0,0,0,.7);
+  border:1px solid rgba(255,255,255,.2);color:#fff;font-size:18px;
+  display:none;align-items:center;justify-content:center;cursor:pointer;z-index:5;line-height:1}
+.gallery-arrow:hover{background:var(--accent);color:#000;border-color:var(--accent)}
+.gallery{flex:1;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 0}
+.gallery::-webkit-scrollbar{display:none}
+.gallery__img{height:120px;border-radius:8px;flex-shrink:0;object-fit:cover;background:var(--surface2)}
+
+/* Sort inline buttons */
+.sort-inline-row{display:flex;gap:6px;padding:0 0 6px;justify-content:flex-end}
+.sort-inline-row{display:none}
+.sort-inline-btn{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.07);
+  font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;
+  transition:all .15s;color:var(--text2);white-space:nowrap;flex-shrink:0}
+.sort-inline-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sort-inline-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+
+/* ── "Vše ›" button in category header ── */
+.category__see-all{background:none;border:1px solid var(--border);border-radius:8px;
+  padding:3px 10px;font-size:12px;font-weight:600;color:var(--text2);
+  cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;margin-right:4px}
+.category__see-all:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,201,167,.08)}
+
+/* ═══════════════════════════════════════════════════
+   TV SERIÁLY — tabs & sections
+═══════════════════════════════════════════════════ */
+.home-media-tabs{display:flex;gap:0;padding:14px 20px 0;border-bottom:1px solid var(--border)}
+.home-media-tab{padding:8px 18px;font-size:13px;font-weight:700;color:var(--text2);
+  border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;background:none}
+.home-media-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ═══════════════════════════════════════════════════
+   TV SEASON & EPISODE STYLES
+═══════════════════════════════════════════════════ */
+.tv-season{background:var(--surface2);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.tv-season__header{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;
+  transition:background .15s;user-select:none}
+.tv-season__header:hover{background:rgba(255,255,255,.04)}
+.tv-season__thumb{width:44px;height:60px;border-radius:6px;overflow:hidden;
+  background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.tv-season__info{flex:1;min-width:0}
+.tv-season__name{font-size:14px;font-weight:700;margin-bottom:2px}
+.tv-season__meta{font-size:11px;color:var(--text2)}
+.tv-season__progress{flex-shrink:0}
+.tv-season__toggle{color:var(--text3);font-size:12px;flex-shrink:0;width:20px;text-align:center}
+.tv-episode-list{display:flex;flex-direction:column;gap:1px;border-top:1px solid var(--border)}
+.tv-episode{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  transition:background .15s;border-bottom:1px solid rgba(255,255,255,.04)}
+.tv-episode:last-child{border-bottom:none}
+.tv-episode--watched{background:rgba(46,125,50,.08)}
+.tv-episode--watched .tv-ep-title{color:var(--text3)}
+.tv-ep-check{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  flex-shrink:0;cursor:pointer;transition:all .15s;color:var(--text3);background:none}
+.tv-ep-check:hover{border-color:var(--accent);color:var(--accent)}
+.tv-ep-check--on{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.tv-ep-check--on:hover{background:#c62828;border-color:#c62828}
+.tv-ep-info{flex:1;min-width:0}
+.tv-ep-num{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px}
+.tv-ep-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-ep-date{font-size:10px;color:var(--text3);margin-top:1px}
+.tv-ep-thumb{width:80px;height:45px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--surface)}
+.tv-ep-thumb--empty{display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--surface2)}
+.tv-ep-play{width:32px;height:32px;border-radius:50%;background:rgba(0,201,167,.15);
+  display:flex;align-items:center;justify-content:center;color:var(--accent);
+  font-size:13px;flex-shrink:0;transition:background .15s;text-decoration:none}
+.tv-ep-play:hover{background:var(--accent);color:#000}
+
+/* ═══════════════════════════════════════════════════
+   ✨ LIQUID GLASS (Apple) + MOTION — Sledovátko, dark-gold theme
+   Frosted translucent panels with depth, a top specular highlight,
+   warm gold light on a near-black base. Replaces the old teal layer.
+═══════════════════════════════════════════════════ */
+:root{
+  /* Tinted dark glass: warm charcoal panels, faint specular top edge */
+  --glass-bg:rgba(255,232,180,.05);
+  --glass-bg-strong:rgba(28,22,14,.62);
+  --glass-border:rgba(255,210,120,.14);
+  --glass-hi:rgba(255,240,210,.22);          /* specular highlight (inset top) */
+  --glass-blur:20px;
+  --ease-spring:cubic-bezier(.22,1,.36,1);
+  /* Reusable liquid-glass shadow stack: depth + inset specular edge */
+  --glass-shadow:0 10px 34px rgba(0,0,0,.5),inset 0 1px 0 var(--glass-hi),inset 0 -1px 0 rgba(0,0,0,.35);
+}
+[data-theme="light"]{
+  --glass-bg:rgba(255,255,255,.55);
+  --glass-bg-strong:rgba(255,255,255,.74);
+  --glass-border:rgba(120,90,20,.16);
+  --glass-hi:rgba(255,255,255,.7);
+  --glass-shadow:0 10px 30px rgba(120,90,20,.16),inset 0 1px 0 var(--glass-hi);
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+::selection{background:rgba(255,194,51,.3);color:#fff}
+
+/* ── Animated aurora background — warm amber/gold on near-black ── */
+body::before{content:'';position:fixed;inset:-25%;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(38% 38% at 18% 22%,rgba(255,194,51,.26),transparent 60%),
+    radial-gradient(36% 36% at 82% 14%,rgba(245,166,35,.24),transparent 60%),
+    radial-gradient(44% 44% at 72% 84%,rgba(176,108,20,.22),transparent 62%),
+    radial-gradient(40% 40% at 24% 86%,rgba(120,70,10,.20),transparent 62%);
+  filter:blur(38px) saturate(1.2);
+  animation:auroraDrift 26s ease-in-out infinite alternate}
+body::after{content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:radial-gradient(125% 85% at 50% -12%,transparent 38%,rgba(5,4,2,.72) 90%)}
+[data-theme="light"] body::after{background:radial-gradient(125% 85% at 50% -12%,transparent 40%,rgba(244,240,232,.7) 88%)}
+@keyframes auroraDrift{
+  0%{transform:translate3d(0,0,0) scale(1) rotate(0deg)}
+  50%{transform:translate3d(2.5%,-2%,0) scale(1.1) rotate(2deg)}
+  100%{transform:translate3d(-2.5%,2.5%,0) scale(1.05) rotate(-2deg)}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}
+#app,#screen{background:transparent}
+
+/* ── Liquid-glass bottom nav ── */
+#bottom-nav{background:var(--glass-bg-strong)!important;
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.6);backdrop-filter:blur(var(--glass-blur)) saturate(1.6);
+  border-top:1px solid var(--glass-border);
+  box-shadow:0 -12px 40px rgba(0,0,0,.45),inset 0 1px 0 var(--glass-hi)}
+.nav-btn{transition:color .2s var(--ease-spring),transform .25s var(--ease-spring)}
+.nav-btn.active{transform:translateY(-3px)}
+.nav-btn.active .nav-btn__icon{filter:drop-shadow(0 0 9px rgba(255,194,51,.9));animation:navPop .4s var(--ease-spring)}
+.nav-btn.active::before{content:'';position:absolute;top:3px;width:30px;height:30px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,194,51,.42),transparent 70%);z-index:-1}
+@keyframes navPop{0%{transform:scale(.55)}60%{transform:scale(1.28)}100%{transform:scale(1)}}
+
+/* ── Shimmering gradient logos (warm gold sweep) ── */
+.home-logo,.setup-logo,.bored-topbar__title{
+  background:linear-gradient(100deg,var(--text) 0%,var(--text) 34%,var(--accent) 48%,var(--accent2) 58%,var(--text) 74%);
+  background-size:250% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent!important;-webkit-text-fill-color:transparent;
+  animation:logoShine 6.5s linear infinite;filter:drop-shadow(0 2px 16px rgba(255,194,51,.3))}
+.home-logo span,.setup-logo span,.bored-topbar__title span{color:transparent!important;-webkit-text-fill-color:transparent}
+@keyframes logoShine{0%{background-position:130% 0}100%{background-position:-130% 0}}
+
+/* ── Buttons: liquid glass + warm glow + shine sweep ── */
+.btn{position:relative;overflow:hidden;
+  transition:transform .18s var(--ease-spring),box-shadow .25s,filter .2s,background .2s,border-color .2s,color .2s}
+.btn--primary{background:linear-gradient(135deg,var(--accent),var(--accent2))!important;color:#1a1206!important;
+  box-shadow:0 6px 22px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn--primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px var(--accent-glow);filter:saturate(1.06) brightness(1.04)}
+.btn--ghost{background:var(--glass-bg)!important;-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);
+  border:1px solid var(--glass-border)!important;box-shadow:inset 0 1px 0 var(--glass-hi)}
+.btn--ghost:hover{transform:translateY(-2px);border-color:var(--accent)!important;color:var(--accent)!important;
+  box-shadow:0 8px 22px var(--accent-glow),inset 0 1px 0 var(--glass-hi)}
+.btn--success{box-shadow:0 6px 20px rgba(46,125,50,.4)}
+.btn:active{transform:translateY(0) scale(.96)}
+.btn::after{content:'';position:absolute;top:0;left:-130%;width:65%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.4),transparent);
+  transform:skewX(-20deg);transition:left .6s ease;pointer-events:none}
+.btn:hover::after{left:150%}
+
+/* ── Inputs liquid glass ── */
+input,textarea,select{background:var(--glass-bg)!important;-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);
+  border:1px solid var(--glass-border)!important;
+  box-shadow:inset 0 1px 0 var(--glass-hi);transition:border-color .2s,box-shadow .2s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(255,194,51,.22),inset 0 1px 0 var(--glass-hi)}
+
+/* ── Modal: frosted liquid glass + bold spring entrance ── */
+.modal-overlay{background:rgba(2,2,2,.6)!important;-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1)}
+.modal{background:var(--glass-bg-strong)!important;-webkit-backdrop-filter:blur(30px) saturate(1.7);backdrop-filter:blur(30px) saturate(1.7);
+  border:1px solid var(--glass-border);box-shadow:0 28px 90px rgba(0,0,0,.7),inset 0 1px 0 var(--glass-hi);
+  transform:translateY(28px) scale(.93)!important;opacity:0;
+  transition:transform .42s var(--ease-spring),opacity .3s ease}
+.modal-overlay.show .modal{transform:translateY(0) scale(1)!important;opacity:1}
+.modal-header{border-bottom:1px solid var(--glass-border)}
+.detail-poster{box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 0 1px rgba(255,210,120,.12)}
+
+/* ── Cards: lift, warm glow, poster zoom, sheen sweep ── */
+.movie-card{transition:transform .3s var(--ease-spring)}
+.movie-card:hover{transform:translateY(-9px) scale(1.05);transform-origin:center bottom}
+.movie-card__poster-wrap{transition:box-shadow .32s ease,transform .32s var(--ease-spring);box-shadow:0 4px 16px rgba(0,0,0,.45)}
+.movie-card:hover .movie-card__poster-wrap{box-shadow:0 18px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,194,51,.5),0 10px 44px rgba(255,194,51,.32)}
+.movie-card__poster{transition:transform .55s var(--ease-spring)}
+.movie-card:hover .movie-card__poster{transform:scale(1.09)}
+.movie-card__poster-wrap::after{content:'';position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:linear-gradient(120deg,transparent 32%,rgba(255,240,200,.24) 48%,transparent 62%);
+  transform:translateX(-135%);transition:transform .75s ease}
+.movie-card:hover .movie-card__poster-wrap::after{transform:translateX(135%)}
+
+/* ── Entrance stagger ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.category{animation:fadeUp .6s var(--ease-spring) both}
+.category:nth-child(1){animation-delay:.03s}.category:nth-child(2){animation-delay:.1s}
+.category:nth-child(3){animation-delay:.17s}.category:nth-child(4){animation-delay:.24s}
+.category:nth-child(5){animation-delay:.31s}.category:nth-child(6){animation-delay:.38s}
+.category:nth-child(7){animation-delay:.45s}.category:nth-child(n+8){animation-delay:.5s}
+.movie-grid .movie-card{animation:fadeUp .5s var(--ease-spring) both}
+.movie-grid .movie-card:nth-child(1){animation-delay:.02s}.movie-grid .movie-card:nth-child(2){animation-delay:.05s}
+.movie-grid .movie-card:nth-child(3){animation-delay:.08s}.movie-grid .movie-card:nth-child(4){animation-delay:.11s}
+.movie-grid .movie-card:nth-child(5){animation-delay:.14s}.movie-grid .movie-card:nth-child(6){animation-delay:.17s}
+.movie-grid .movie-card:nth-child(7){animation-delay:.2s}.movie-grid .movie-card:nth-child(8){animation-delay:.23s}
+.movie-grid .movie-card:nth-child(9){animation-delay:.26s}.movie-grid .movie-card:nth-child(10){animation-delay:.29s}
+.movie-grid .movie-card:nth-child(n+11){animation-delay:.32s}
+
+/* ── Chips & icon buttons ── */
+.mood-chip{-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);
+  box-shadow:inset 0 1px 0 var(--glass-hi);transition:all .2s var(--ease-spring)}
+.mood-chip:hover,.mood-chip.active{transform:translateY(-2px);box-shadow:0 8px 20px var(--accent-glow)}
+.icon-btn{-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);
+  border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-hi);transition:all .22s var(--ease-spring)}
+.icon-btn:hover{transform:translateY(-2px) rotate(-5deg);box-shadow:0 8px 20px var(--accent-glow)}
+.home-stats-chip{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 4px 14px var(--accent-glow),inset 0 1px 0 var(--glass-hi)}
+
+/* ── Rating buttons & badges ── */
+.rating-btn{transition:all .18s var(--ease-spring)}
+.rating-btn:hover{transform:translateY(-2px)}
+.rating-btn.active{box-shadow:0 5px 16px var(--accent-glow)}
+.badge{background:var(--grad-accent)!important;color:#1a1206!important;box-shadow:0 4px 14px var(--accent-glow)}
+
+/* ── Episodes: liquid-glass seasons, animated progress, check pop ── */
+.tv-season{background:var(--glass-bg)!important;-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);
+  border:1px solid var(--glass-border)!important;box-shadow:var(--glass-shadow);
+  transition:box-shadow .25s,transform .2s var(--ease-spring)}
+.tv-season:hover{box-shadow:0 14px 34px rgba(0,0,0,.5),inset 0 1px 0 var(--glass-hi)}
+.tv-episode{transition:background .2s}
+.ep-progress-track{box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+.ep-progress-fill{background:linear-gradient(90deg,var(--accent),var(--accent2))!important;position:relative;overflow:hidden;
+  box-shadow:0 0 12px var(--accent-glow)}
+.ep-progress-fill::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:translateX(-100%);animation:epShimmer 1.9s linear infinite}
+@keyframes epShimmer{to{transform:translateX(220%)}}
+.tv-ep-check{transition:all .2s var(--ease-spring)}
+.tv-ep-check--on{animation:checkPop .38s var(--ease-spring)}
+@keyframes checkPop{0%{transform:scale(.5)}55%{transform:scale(1.32)}100%{transform:scale(1)}}
+.tv-season__markall{transition:all .2s var(--ease-spring)}
+.tv-season__markall:hover{transform:translateY(-1px);box-shadow:0 5px 16px var(--accent-glow)}
+
+/* ── Daily card, category arrows, scrollbar ── */
+.daily-card{transition:transform .25s var(--ease-spring),box-shadow .25s,filter .2s}
+.daily-card:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(0,0,0,.5)}
+.category__arrow{-webkit-backdrop-filter:blur(8px) saturate(1.4);backdrop-filter:blur(8px) saturate(1.4)}
+#screen::-webkit-scrollbar-thumb{background:linear-gradient(var(--accent),var(--accent2));border-radius:4px}
+.spinner{filter:drop-shadow(0 0 6px var(--accent-glow))}
+
+/* ═══════════════════════════════════════════════════
+   ✨✨ INTERACTIVE COLOR + APPLE-LIKE MOTION (Tasks 2/3/4)
+   Builds on the glass layer above. Re-tints the aurora to the new accent duo,
+   adds page/panel transitions, and gives every button a pro micro-interaction.
+═══════════════════════════════════════════════════ */
+
+/* ── Re-tint aurora background to the warm gold/amber palette ── */
+body::before{
+  background:
+    radial-gradient(38% 38% at 18% 22%,rgba(var(--accent-rgb),.28),transparent 60%),
+    radial-gradient(36% 36% at 82% 14%,rgba(var(--accent2-rgb),.26),transparent 60%),
+    radial-gradient(44% 44% at 72% 84%,rgba(176,108,20,.22),transparent 62%),
+    radial-gradient(40% 40% at 24% 86%,rgba(var(--accent2-rgb),.20),transparent 62%);
+  filter:blur(38px) saturate(1.2);
+}
+
+/* ── PAGE LOAD: whole app fades/scales/un-blurs in (Apple-style) ── */
+@keyframes appIntro{from{opacity:0;transform:scale(.985) translateY(10px);filter:blur(6px)}
+  to{opacity:1;transform:none;filter:blur(0)}}
+#app{animation:appIntro .65s var(--ease-spring) both}
+#bottom-nav{animation:navIntro .7s var(--ease-spring) both;animation-delay:.12s}
+@keyframes navIntro{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+/* ── PANEL SWITCH: #screen content nabíhá zdola s fade (hook v navigate()) ── */
+@keyframes screenEnter{from{opacity:0;transform:translateY(18px) scale(.992)}
+  to{opacity:1;transform:none}}
+.screen-enter{animation:screenEnter .42s var(--ease-spring) both;will-change:transform,opacity}
+
+/* ── ACTIVE NAV: gentle living pulse in accent ── */
+@keyframes navGlowPulse{
+  0%,100%{filter:drop-shadow(0 0 6px var(--accent-glow))}
+  50%{filter:drop-shadow(0 0 13px var(--accent-glow)) drop-shadow(0 0 4px var(--accent2-glow))}}
+.nav-btn.active .nav-btn__icon{animation:navPop .4s var(--ease-spring),navGlowPulse 2.6s ease-in-out infinite 0.4s}
+.nav-btn:focus-visible{outline:none;color:var(--accent)}
+.nav-btn:not(.active):hover{color:var(--accent);transform:translateY(-2px)}
+.nav-btn:active{transform:translateY(0) scale(.94)}
+
+/* ── UNIVERSAL BUTTON MICRO-INTERACTION ──
+   Every interactive control: spring transition, press-down on active,
+   accessible focus glow. Color reacts (accent shift / glow) on interaction. */
+.nav-btn,.icon-btn,.mood-chip,.rating-btn,.category__arrow,.modal-close,
+.tv-ep-check,.tv-season__markall,.btn,.kv-source-btn,.bored-filter,
+.filter-chip,.chip,.col-chip,.suggestion,.category__see-all{
+  transition:transform .2s var(--ease-spring),box-shadow .22s ease,
+    background .22s ease,color .2s ease,border-color .2s ease,filter .2s ease;
+}
+/* Accessible focus ring for the whole interactive set */
+.btn:focus-visible,.icon-btn:focus-visible,.mood-chip:focus-visible,
+.rating-btn:focus-visible,.modal-close:focus-visible,.tv-ep-check:focus-visible,
+.tv-season__markall:focus-visible,.kv-source-btn:focus-visible,
+.bored-filter:focus-visible,.filter-chip:focus-visible,.col-chip:focus-visible,
+.chip:focus-visible,.suggestion:focus-visible,.category__see-all:focus-visible{
+  outline:none;box-shadow:0 0 0 3px var(--focus-ring);
+}
+
+/* ── .btn: shine sweep already exists above; add interactive hue + press ── */
+.btn--primary{background:var(--grad-accent)!important;background-size:160% 160%!important;
+  background-position:0% 50%;transition:transform .18s var(--ease-spring),
+    box-shadow .25s,filter .2s,background-position .5s ease;
+  box-shadow:0 6px 22px var(--accent-glow)}
+.btn--primary:hover{background-position:100% 50%;filter:saturate(1.08) brightness(1.05);
+  box-shadow:0 12px 30px var(--accent-glow),0 0 22px var(--accent2-glow)}
+.btn--primary:active{transform:translateY(0) scale(.95)}
+
+/* ── icon-btn: accent fill + subtle hue rotate on hover ── */
+.icon-btn:hover{background:rgba(var(--accent-rgb),.16);color:var(--accent);
+  box-shadow:0 8px 22px var(--accent-glow)}
+.icon-btn:active{transform:translateY(0) scale(.9) rotate(-5deg)}
+
+/* ── mood-chip: living gradient when active ── */
+.mood-chip.active{background:var(--grad-accent);color:#1a1206;border-color:transparent;
+  box-shadow:0 6px 18px var(--accent-glow)}
+.mood-chip:active{transform:scale(.95)}
+
+/* ── rating-btn: glow on hover/active, press feedback ── */
+.rating-btn:hover{background:rgba(var(--accent-rgb),.18);border-color:var(--accent);
+  color:var(--accent);box-shadow:0 6px 16px var(--accent-glow)}
+.rating-btn.active{background:var(--grad-accent);border-color:transparent;color:#1a1206}
+.rating-btn:active{transform:scale(.9)}
+
+/* ── modal-close: spin-press + accent on hover ── */
+.modal-close{border-radius:8px;transition:transform .2s var(--ease-spring),
+  background .2s,color .2s,box-shadow .2s}
+.modal-close:hover{background:rgba(var(--accent-rgb),.15);color:var(--accent);
+  transform:rotate(90deg)}
+.modal-close:active{transform:rotate(90deg) scale(.85)}
+
+/* ── tv-ep-check: press feedback (pop on toggle already defined) ── */
+.tv-ep-check:hover{box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18)}
+.tv-ep-check:active{transform:scale(.85)}
+
+/* ── tv-season__markall: accent glow on hover ── */
+.tv-season__markall:hover{color:var(--accent);box-shadow:0 5px 16px var(--accent-glow)}
+.tv-season__markall:active{transform:scale(.95)}
+
+/* ── category arrow / see-all press ── */
+.category__see-all:hover{border-color:var(--accent);color:var(--accent);
+  background:rgba(var(--accent-rgb),.1);box-shadow:0 4px 14px var(--accent-glow)}
+.category__see-all:active{transform:scale(.95)}
+
+/* ── filter / bored / collection chips: accent-driven active state ── */
+.filter-chip.active,.bored-filter.active,.col-chip.active{
+  background:var(--grad-accent);color:#1a1206;border-color:transparent;
+  box-shadow:0 5px 14px var(--accent-glow)}
+.filter-chip:active,.bored-filter:active,.col-chip:active,.chip:active,
+.suggestion:active{transform:scale(.95)}
+.chip:hover,.suggestion:hover{box-shadow:0 5px 14px var(--accent-glow)}
+
+/* ── Generic hover shadow/text glow already present; keep GPU-friendly ── */
+.movie-card,.btn,.mood-chip,.icon-btn,.rating-btn,.category__arrow,
+.daily-card,.nav-btn{will-change:transform}
+
+/* ═══════════════════════════════════════════════════
+   ✨✨✨ DARK-GOLD CONSOLIDATION + LIQUID GLASS PANELS + LIQUID TRANSITIONS
+   Retints every remaining hardcoded teal element to gold, frosts the rest of
+   the panels, and upgrades the screen/home-tab transitions. Last layer wins.
+═══════════════════════════════════════════════════ */
+
+/* ── Retint leftover teal accents → gold ── */
+.btn--quick-add{background:rgba(255,194,51,.92)!important;color:#1a1206!important}
+mark{background:rgba(255,194,51,.26);color:var(--accent)}
+.category__arrow:hover{background:rgba(255,194,51,.32);border-color:var(--accent);color:var(--accent);
+  box-shadow:0 6px 20px var(--accent-glow)}
+.home-stats-chip{background:rgba(255,194,51,.14);color:var(--accent)}
+.icon-btn:hover{background:rgba(255,194,51,.16)}
+.bored-btn:hover{border-color:var(--accent);background:rgba(255,194,51,.08)}
+.genre-btn:hover{border-color:var(--accent);background:rgba(255,194,51,.1)}
+.kv-num{background:rgba(255,194,51,.16)}
+.kv-movie-card:hover{border-color:var(--accent);background:rgba(255,194,51,.07)}
+.kv-source-btn.active{background:rgba(255,194,51,.13)}
+.tv-ep-play{background:rgba(255,194,51,.16)}
+.category__see-all:hover{background:rgba(255,194,51,.1)}
+
+/* ── Liquid-glass panels across the rest of the app ── */
+.search-header,.favs-header{background:transparent!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4)}
+.filter-panel,.stats-panel,.kv-intro,.tip-card,.bored-topbar,.hon-card,.daily-card{
+  background:var(--glass-bg-strong)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);
+  border:1px solid var(--glass-border)!important;box-shadow:var(--glass-shadow)}
+.tip-card,.kv-intro{border-color:rgba(255,194,51,.22)!important}
+.stats-panel{border-color:rgba(255,194,51,.18)!important}
+.daily-card{box-shadow:var(--glass-shadow)}
+.empty-state__title{color:var(--text)}
+.suggestion,.tip-card,.kv-theme{background:rgba(255,194,51,.12)}
+.suggestion:hover{background:rgba(255,194,51,.25)}
+.kv-theme{color:var(--accent)}
+.hon-progress__fill,.hon-btn--save .hon-btn__circle{box-shadow:0 0 14px var(--accent-glow)}
+.hon-card{box-shadow:0 16px 50px rgba(0,0,0,.6),inset 0 1px 0 var(--glass-hi)}
+.bulk-toolbar,.ctx-menu{background:var(--glass-bg-strong)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);
+  border-color:var(--glass-border)!important}
+
+/* ── Native dropdowns legible: solid dark closed + option list, light text ── */
+select{color:var(--text)!important}
+select option{background:var(--surface)!important;color:var(--text)!important}
+[data-theme="light"] select option{background:#fff!important;color:var(--text)!important}
+
+/* ── LIQUID screen transition: crossfade + lift + scale + un-blur ── */
+@keyframes screenEnter{
+  0%{opacity:0;transform:translateY(22px) scale(.985);filter:blur(7px)}
+  60%{filter:blur(0)}
+  100%{opacity:1;transform:none;filter:blur(0)}}
+.screen-enter{animation:screenEnter .5s var(--ease-spring) both;will-change:transform,opacity,filter}
+
+/* ── Home Filmy/Seriály tab swap: re-rendered categories already use fadeUp;
+     give the freshly injected #main-cats a soft container fade too ── */
+#main-cats{animation:catsFade .4s var(--ease-spring) both}
+@keyframes catsFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.home-media-tab{transition:color .2s var(--ease-spring),border-color .2s var(--ease-spring)}
+.home-media-tab.active{text-shadow:0 0 14px var(--accent-glow)}
+
+/* ── REDUCED MOTION: calm everything down ── */
+@media (prefers-reduced-motion:reduce){
+  #app,#bottom-nav,.screen-enter,.category,.movie-grid .movie-card,#main-cats{animation:none!important}
+  .nav-btn.active .nav-btn__icon{animation:none!important}
+  .ep-progress-fill::after{animation:none!important}
+  .home-logo,.setup-logo,.bored-topbar__title{animation:none!important}
+  .screen-enter{filter:none!important}
+  *{transition-duration:.12s!important}
+  .movie-card:hover{transform:translateY(-4px)!important}
+  .modal-close:hover{transform:none!important}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<div id="app">
+  <div id="screen"><!-- content injected here --></div>
+  <nav id="bottom-nav" class="hidden">
+    <button class="nav-btn active" data-screen="home">
+      <div class="nav-btn__icon">🏠</div>
+      <div>Domů</div>
+    </button>
+    <button class="nav-btn" data-screen="search">
+      <div class="nav-btn__icon">🔍</div>
+      <div>Hledat</div>
+    </button>
+    <button class="nav-btn" data-screen="favorites">
+      <div class="nav-btn__icon">❤️</div>
+      <div>Oblíbené</div>
+      <div class="nav-btn__badge hidden" id="fav-badge"></div>
+    </button>
+
+  </nav>
+</div>
+
+<script src="js/auth.js" type="module"></script>
+<script src="js/api.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/bored.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+//  app.js — Router & screens
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const App = {
+  currentScreen: null,
+  genreCache: [],
+  _boredGrid: null,
+
+  async init() {
+    // Check auth — show login if not authenticated
+    if (typeof Auth !== 'undefined') {
+      Auth.init();
+      if (!Auth.isLoggedIn) {
+        renderAuthScreen(() => this.init());
+        return;
+      }
+    }
+
+    // Check token
+    // Hardcoded TMDB Bearer token
+    const HARDCODED_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzdiYTNiOTY2OGM2NTMzZjFhNzU3MTEzYWQ4MWQwMyIsIm5iZiI6MTc3MzkwNjMzNS40ODE5OTk5LCJzdWIiOiI2OWJiYTk5ZmRkMGUwMDM2MTMwNTI2ZDMiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.yCoClpY_j6h_wmrkxoBzQ3v4FxgZ8JOmzwHwXXS1ryw';
+    const token = HARDCODED_TOKEN || Storage.getToken();
+    if (!token) { this.showSetup(); return; }
+    API.setToken(token);
+    Storage.setToken(token);
+
+    // Theme
+    this.applyTheme(Storage.getTheme());
+
+    // Nav
+    document.getElementById('bottom-nav').classList.remove('hidden');
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.navigate(btn.dataset.screen));
+    });
+
+    // Add user menu to nav
+    this._addUserMenu();
+
+    // Favorites badge
+    document.addEventListener('favorites-changed', () => this.updateBadge());
+    this.updateBadge();
+
+    // Load genres
+    this.genreCache = await API.getGenres().catch(() => []);
+
+    this.navigate('home');
+  },
+
+  _addUserMenu() {
+    if (typeof Auth === 'undefined' || !Auth.isLoggedIn) return;
+    const nav = document.getElementById('bottom-nav');
+    if (!nav || nav.querySelector('#user-nav-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'nav-btn';
+    btn.id = 'user-nav-btn';
+    btn.innerHTML = `<div class="nav-btn__icon">👤</div><div>${Auth.currentUser.username}</div>`;
+    btn.addEventListener('click', () => {
+      if (confirm(`Odhlásit se jako ${Auth.currentUser.username}?`)) Auth.logout();
+    });
+    nav.appendChild(btn);
+  },
+
+  applyTheme(theme) {
+    document.body.dataset.theme = theme;
+    Storage.setTheme(theme);
+  },
+
+  toggleTheme() {
+    const current = Storage.getTheme();
+    this.applyTheme(current === 'dark' ? 'light' : 'dark');
+  },
+
+  navigate(screen) {
+    // Kill any active mini trailer preview
+    if (typeof hideMiniTrailer === 'function') {
+      document.querySelectorAll('.movie-card').forEach(card => {
+        card._hoverActive = false;
+        clearTimeout(card._miniTimer);
+      });
+      if (typeof _miniBox !== 'undefined' && _miniBox) {
+        clearInterval(_miniBox._slideInterval);
+        _miniBox.remove();
+        window._miniBox = null;
+      }
+      const bd = document.getElementById('_mini-bd');
+      if (bd) bd.remove();
+      window._miniPlayerActive = null;
+    }
+    // Destroy bored grid if leaving
+    if (this._boredGrid && screen !== 'bored') {
+      this._boredGrid.destroy();
+      this._boredGrid = null;
+    }
+    this.currentScreen = screen;
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.screen === screen);
+    });
+    const s = document.getElementById('screen');
+    // Reset overflow in case bored/hotnot set it
+    s.style.overflow = '';
+    s.style.height = '';
+    s.scrollTo(0, 0);
+    switch(screen) {
+      case 'home':      this.renderHome(); break;
+      case 'search':    this.renderSearch(); break;
+      case 'favorites': this.renderFavorites(); break;
+      case 'hotnot':    this.renderHotOrNotLanding(); break;
+    }
+    // ── TASK 3: restart the Apple-style panel-enter animation on every navigation ──
+    s.classList.remove('screen-enter');
+    void s.offsetWidth; // force reflow so the animation re-triggers
+    s.classList.add('screen-enter');
+  },
+
+  updateBadge() {
+    const favs = Storage.getFavorites();
+    const watched = Storage.getWatchedIds();
+    const unwatched = favs.filter(m => !watched.has(m.imdbId)).length;
+    const badge = document.getElementById('fav-badge');
+    if (badge) {
+      badge.textContent = unwatched;
+      badge.classList.toggle('hidden', unwatched === 0);
+    }
+  },
+
+  // ════════════════════════════════════════════════
+  //  SETUP
+  // ════════════════════════════════════════════════
+  showSetup() {
+    document.getElementById('screen').innerHTML = `
+    <div class="setup-screen">
+      <div class="setup-card">
+        <div class="setup-logo">Sledov<span>á</span>tko</div>
+        <div class="setup-sub">Tvůj osobní filmový watchlist. Pro start potřebuješ API klíč z TMDB.</div>
+        <ul class="setup-steps">
+          <li>Jdi na <a href="https://www.themoviedb.org" target="_blank">themoviedb.org</a></li>
+          <li>Zaregistruj se (zdarma)</li>
+          <li>Nastav → API → vytvoř klíč</li>
+          <li>Zkopíruj <strong>Bearer Token (API Read Access)</strong></li>
+        </ul>
+        <div class="setup-input-row">
+          <input id="token-input" type="password" class="input" placeholder="Bearer token...">
+          <button class="btn btn--primary" id="token-save">Spustit</button>
+        </div>
+        <p id="token-err" style="color:#E53935;font-size:12px;margin-top:8px;display:none">Neplatný token. Zkus znovu.</p>
+      </div>
+    </div>`;
+    document.getElementById('token-save').addEventListener('click', async () => {
+      const val = document.getElementById('token-input').value.trim();
+      if (!val) return;
+      API.setToken(val);
+      try {
+        await API.getGenres();
+        Storage.setToken(val);
+        this.init();
+      } catch {
+        document.getElementById('token-err').style.display = '';
+      }
+    });
+  },
+
+  // ════════════════════════════════════════════════
+  //  HOME
+  // ════════════════════════════════════════════════
+  async renderHome() {
+    const s = document.getElementById('screen');
+    const theme = Storage.getTheme();
+    const hour = new Date().getHours();
+    const greeting = hour < 6 ? 'Noční sova 🦉' : hour < 12 ? 'Dobré ráno ☀️' : hour < 18 ? 'Dobré odpoledne 🎬' : 'Dobrý večer 🌙';
+    const stats = Storage.getStats();
+    const collapsed = Storage.getCollapsed();
+
+    s.innerHTML = `
+      <div class="home-greeting">${greeting}</div>
+      <div class="home-header">
+        <div class="home-logo">Sledov<span>á</span>tko</div>
+        ${stats.total > 0 ? `<span class="home-stats-chip">${stats.watched}/${stats.total} viděno</span>` : ''}
+        <button class="icon-btn" id="btn-random" title="Náhodný film">🎲</button>
+        <button class="icon-btn" id="btn-sync" title="Synchronizace zařízení">🔄</button>
+        <button class="icon-btn" id="btn-theme" title="Přepnout téma">${theme === 'dark' ? '☀️' : '🌙'}</button>
+      </div>
+      <div class="mood-section">
+        <div class="mood-label">Na co máš náladu?</div>
+        <div class="mood-chips" id="mood-chips">
+          <div class="mood-chip active" data-genre="">✨ Vše</div>
+          ${this.genreCache.slice(0, 10).map(g =>
+            `<div class="mood-chip" data-genre="${g.id}">${GENRE_EMOJIS[g.id] || '🎬'} ${g.name}</div>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="action-btns-row">
+        <div class="bored-btn" id="btn-bored">
+          <div class="bored-btn__emoji">😴</div>
+          <div class="bored-btn__text">
+            <div class="bored-btn__title">Bored?</div>
+            <div class="bored-btn__sub">Stovky filmů k objevení</div>
+          </div>
+          <div class="bored-btn__arrow">›</div>
+        </div>
+        <div class="bored-btn hotnot-btn" id="btn-hotnot-home">
+          <div class="bored-btn__emoji">🔥</div>
+          <div class="bored-btn__text">
+            <div class="bored-btn__title">Hot or Not</div>
+            <div class="bored-btn__sub">Rychle vybírej filmy</div>
+          </div>
+          <div class="bored-btn__arrow">›</div>
+        </div>
+      </div>
+      <div id="daily-slot"></div>
+      <div class="home-media-tabs" id="media-tabs">
+        <button class="home-media-tab active" data-media="movie">🎬 Filmy</button>
+        <button class="home-media-tab" data-media="tv">📺 Seriály</button>
+      </div>
+      <div id="main-cats">
+        ${spinner('Načítám filmy...')}
+      </div>
+    `;
+
+    // Buttons
+    document.getElementById('btn-random').addEventListener('click', async () => {
+      // Pick truly random from popular catalog
+      const page = Math.floor(Math.random() * 15) + 1;
+      try {
+        const data = await fetch(`https://api.themoviedb.org/3/movie/popular?language=cs-CZ&page=${page}`,
+          { headers: { 'Authorization': 'Bearer ' + API.getToken() }}).then(r => r.json());
+        const results = (data.results || []).filter(m => m.poster_path);
+        if (results.length) {
+          const raw = results[Math.floor(Math.random() * results.length)];
+          const movie = {
+            id: raw.id, title: raw.title || raw.name || '?',
+            year: (raw.release_date || '').substring(0,4),
+            imdbId: String(raw.id),
+            posterUrl: raw.poster_path ? `https://image.tmdb.org/t/p/w342${raw.poster_path}` : '',
+            backdropUrl: raw.backdrop_path ? `https://image.tmdb.org/t/p/w780${raw.backdrop_path}` : '',
+            rating: (raw.vote_count || 0) >= 10 ? (raw.vote_average || 0) : 0,
+            overview: raw.overview || '', genreIds: raw.genre_ids || [],
+            releaseDate: raw.release_date || '', mediaType: 'movie',
+          };
+          openMovieDetail(movie);
+        }
+      } catch { showToast('Chyba při načítání náhodného filmu'); }
+    });
+    document.getElementById('btn-theme').addEventListener('click', () => {
+      this.toggleTheme();
+      document.getElementById('btn-theme').textContent = Storage.getTheme() === 'dark' ? '☀️' : '🌙';
+    });
+    document.getElementById('btn-sync').addEventListener('click', () => showSyncModal());
+    document.getElementById('btn-bored').addEventListener('click', () => this.renderBored());
+    document.getElementById('btn-hotnot-home').addEventListener('click', () => this.navigate('hotnot'));
+
+    // Media tabs (Filmy / Seriály)
+    document.getElementById('media-tabs').addEventListener('click', e => {
+      const tab = e.target.closest('.home-media-tab');
+      if (!tab) return;
+      document.querySelectorAll('.home-media-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const mediaType = tab.dataset.media;
+      // Hide mood chips and daily card for TV
+      const moodSection = document.querySelector('.mood-section');
+      const dailySlot = document.getElementById('daily-slot');
+      if (moodSection) moodSection.style.display = mediaType === 'tv' ? 'none' : '';
+      if (dailySlot) dailySlot.style.display = mediaType === 'tv' ? 'none' : '';
+      this._loadMainCategories(mediaType);
+    });
+
+    // Mood chips
+    document.getElementById('mood-chips').addEventListener('click', async e => {
+      const chip = e.target.closest('.mood-chip');
+      if (!chip) return;
+      const genreId = chip.dataset.genre;
+      const alreadyActive = chip.classList.contains('active');
+
+      document.querySelectorAll('.mood-chip').forEach(c => c.classList.remove('active'));
+
+      // FIX #13: clicking active genre deselects it → show all
+      if (alreadyActive && genreId) {
+        document.querySelector('.mood-chip[data-genre=""]').classList.add('active');
+        this._loadMainCategories();
+        return;
+      }
+
+      chip.classList.add('active');
+      if (!genreId) {
+        this._loadMainCategories();
+      } else {
+        const main = document.getElementById('main-cats');
+        main.innerHTML = spinner('Načítám žánr...');
+        const movies = await API.getByGenre(parseInt(genreId), 2).catch(() => []);
+        const g = this.genreCache.find(g => g.id === parseInt(genreId));
+        main.innerHTML = buildCategoryRow('mood', `${GENRE_EMOJIS[parseInt(genreId)] || '🎬'} ${g?.name || ''}`, movies, { accentColor: 'var(--accent)' });
+        attachCategoryEvents('main-cats');
+      }
+    });
+
+    // Daily
+    API.getDailyMovie().then(movie => {
+      if (!movie) return;
+      document.getElementById('daily-slot').innerHTML = `
+        <div class="daily-card" id="daily-card">
+          ${movie.backdropUrl ? `<img class="daily-card__bg" src="${movie.backdropUrl}" alt="">` : ''}
+          <div class="daily-card__content">
+            ${movie.posterUrl ? `<img class="daily-card__poster" src="${movie.posterUrl}" alt="">` : ''}
+            <div>
+              <div class="daily-card__label">🌟 Film dne</div>
+              <div class="daily-card__title">${escHtml(movie.title)}</div>
+              <div class="daily-card__sub">${movie.year}${movie.rating > 0 ? ` · ★ ${movie.rating.toFixed(1)}` : ''}</div>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById('daily-card').addEventListener('click', () => openMovieDetail(movie));
+    }).catch(() => {});
+
+
+
+    this._loadMainCategories();
+  },
+
+  async _loadMainCategories(mediaType = 'movie') {
+    const main = document.getElementById('main-cats');
+    if (!main) return;
+    main.innerHTML = spinner('Načítám...');
+    try {
+      if (mediaType === 'tv') {
+        main.innerHTML = spinner('Načítám seriály...');
+        const [tvPopular, tvTopRated, tvOnAir, tvAiring] = await Promise.all([
+          API.getTVPopular().catch(e => { console.error('getTVPopular', e); return []; }),
+          API.getTVTopRated().catch(e => { console.error('getTVTopRated', e); return []; }),
+          API.getTVOnAir().catch(e => { console.error('getTVOnAir', e); return []; }),
+          API.getTVAiringToday().catch(e => { console.error('getTVAiringToday', e); return []; }),
+        ]);
+        main.innerHTML =
+          buildCategoryRow('tv-popular',  '🔥 Populární seriály',    tvPopular,  { accentColor: '#FFB300', collapsible: true }) +
+          buildCategoryRow('tv-toprated', '⭐ Nejlépe hodnocené',     tvTopRated, { accentColor: '#E0A52E', collapsible: true }) +
+          buildCategoryRow('tv-onair',    '📡 Právě vysílané',        tvOnAir,    { accentColor: '#C8862B', collapsible: true }) +
+          buildCategoryRow('tv-airing',   '📅 Dnes na programu',      tvAiring,   { accentColor: '#9C6B2E', collapsible: true });
+        // Attach TV card click override
+        const mainEl = document.getElementById('main-cats');
+        if (mainEl && !mainEl._tvClickAttached) {
+          mainEl._tvClickAttached = true;
+          mainEl.addEventListener('click', e => {
+            const card = e.target.closest('.movie-card');
+            if (!card) return;
+            if (e.target.closest('[data-action]')) return;
+            let show; try { show = JSON.parse(card.dataset.movie); } catch { return; }
+            if (show.mediaType === 'tv') { e.stopImmediatePropagation(); openTVDetail(show); }
+          }, true);
+        }
+        attachCategoryEvents('main-cats');
+      } else {
+        const [popular, nowPlaying, topRated, upcoming] = await Promise.all([
+          API.getPopular(), API.getNowPlaying(), API.getTopRated(), API.getUpcoming()
+        ]);
+        const upcomingDedup = API.deduplicateAgainst(upcoming, nowPlaying);
+        main.innerHTML =
+          buildCategoryRow('popular',    '🔥 Populární',       popular,       { accentColor: '#FFB300', collapsible: true, sectionKey: 'popular' }) +
+          buildCategoryRow('nowplaying', '🎬 Právě v kinech',  nowPlaying,    { accentColor: '#E0A52E', collapsible: true, sectionKey: 'nowplaying' }) +
+          buildCategoryRow('toprated',  '⭐ Top hodnocené',    topRated,      { accentColor: '#C8862B', collapsible: true, sectionKey: 'toprated' }) +
+          buildCategoryRow('upcoming',  '🗓 Nadcházející',     upcomingDedup, { accentColor: '#9C6B2E', collapsible: true, sectionKey: 'upcoming' });
+        attachCategoryEvents('main-cats');
+      }
+    } catch(e) {
+      main.innerHTML = `<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Chyba načítání</div></div>`;
+    }
+  },
+
+  // ════════════════════════════════════════════════
+  //  SEARCH
+  // ════════════════════════════════════════════════
+  _searchState: { query: '', filters: {}, sortBy: 'relevance', bulkMode: false, bulkSelected: new Set(), loading: false },
+
+  renderSearch() {
+    const s = document.getElementById('screen');
+    const st = this._searchState;
+    const history = Storage.getHistory();
+    const savedSearches = Storage.getSavedSearches();
+
+    s.innerHTML = `
+      <div class="search-header">
+        <div class="search-bar-row">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="search-input" type="text" placeholder="Název..." value="${escHtml(st.query)}">
+            <button class="search-clear ${st.query ? 'visible' : ''}" id="search-clear">✕</button>
+          </div>
+          ${(() => {
+            const s = st.sortBy;
+            const ratingDir = s === 'rating_desc' ? 'desc' : s === 'rating_asc' ? 'asc' : null;
+            const yearDir   = s === 'year_desc'   ? 'desc' : s === 'year_asc'   ? 'asc' : null;
+            const titleDir  = s === 'title_az'    ? 'asc'  : s === 'title_za'   ? 'desc': null;
+            return `<button class="sort-inline-btn ${ratingDir?'active':''}" data-sort-group="rating" title="Seřadit dle hodnocení">★${ratingDir?(' '+(ratingDir==='asc'?'↑':'↓')):''}
+            </button><button class="sort-inline-btn ${yearDir?'active':''}" data-sort-group="year" title="Seřadit dle roku">📅${yearDir?(' '+(yearDir==='asc'?'↑':'↓')):''}
+            </button><button class="sort-inline-btn ${titleDir?'active':''}" data-sort-group="title" title="Seřadit dle názvu">A${titleDir?(' '+(titleDir==='desc'?'↓':'↑')):''}
+            </button>`;
+          })()}
+          <button class="btn btn--ghost btn--sm" id="filter-toggle">${st.showFilters ? "▲" : "▼"} Filtry</button>
+        </div>
+        <div class="filter-panel ${st.showFilters ? 'open' : ''}" id="filter-panel">
+          <div class="filter-row">
+            <div class="filter-label">Typ:</div>
+            <div class="filter-chips">
+              <div class="filter-chip ${!st.filters.searchTV ? 'active' : ''}" data-type="movie">🎬 Film</div>
+              <div class="filter-chip ${st.filters.searchTV ? 'active' : ''}" data-type="tv">📺 Seriál</div>
+            </div>
+            <select class="sort-select" id="sort-select" style="margin-left:auto">
+              <option value="relevance" ${st.sortBy==='relevance'?'selected':''}>Relevance</option>
+              <option value="rating"    ${st.sortBy==='rating'   ?'selected':''}>Hodnocení</option>
+              <option value="year_desc" ${st.sortBy==='year_desc'?'selected':''}>Nejnovější</option>
+              <option value="year_asc"  ${st.sortBy==='year_asc' ?'selected':''}>Nejstarší</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <div class="filter-label">Rok od:</div>
+            <div class="range-row" style="flex:1">
+              <input type="range" id="year-from" min="1950" max="${new Date().getFullYear()}" value="${st.filters.yearFrom || 1950}">
+              <div class="range-val" id="year-from-val">${st.filters.yearFrom || 'Vše'}</div>
+            </div>
+            <div class="filter-label" style="margin-left:12px">do:</div>
+            <div class="range-row" style="flex:1">
+              <input type="range" id="year-to" min="1950" max="${new Date().getFullYear()}" value="${st.filters.yearTo || new Date().getFullYear()}">
+              <div class="range-val" id="year-to-val">${st.filters.yearTo || 'Vše'}</div>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-label">Min. ★:</div>
+            <div class="range-row" style="flex:1">
+              <input type="range" id="min-rating" min="0" max="9" step="0.5" value="${st.filters.minRating || 0}">
+              <div class="range-val" id="min-rating-val">${st.filters.minRating || 'Vše'}</div>
+            </div>
+            <button class="btn btn--sm btn--ghost" id="reset-filters" style="margin-left:12px">Reset</button>
+          </div>
+          <div class="filter-row">
+            <div class="filter-label">Max. filmů:</div>
+            <div class="range-row" style="flex:1">
+              <input type="range" id="max-results" min="3" max="250" step="1" value="${st.maxPages || 10}">
+              <div class="range-val" id="max-results-val">${(st.maxPages || 10) * 20}</div>
+            </div>
+          </div>
+          <div class="filter-chips" id="genre-filter-chips">
+            <div class="filter-chip ${!st.filters.genreId ? 'active' : ''}" data-genre="">Vše</div>
+            ${this.genreCache.map(g =>
+              `<div class="filter-chip ${st.filters.genreId===g.id?'active':''}" data-genre="${g.id}">${GENRE_EMOJIS[g.id]||'🎬'} ${g.name}</div>`
+            ).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div id="search-results">
+        ${this._buildSearchEmpty(history, savedSearches)}
+      </div>`;
+
+    this._attachSearchEvents();
+    if (st.query) this._doSearch(st.query);
+    else if (st.filters.genreId || st.filters.yearFrom || st.filters.yearTo || st.filters.minRating) {
+      // Auto-search if filters are set but no query
+      this._doSearch('');
+    }
+  },
+
+  _buildSearchEmpty(history, savedSearches) {
+    const tip = ''; // will be loaded async
+    const genres = this.genreCache;
+    return `
+      ${savedSearches.length ? `
+        <div class="history-section">
+          <div class="history-label">⭐ Uložená hledání</div>
+          <div class="chip-row">${savedSearches.map(q => this._chipHtml(q, true)).join('')}</div>
+        </div>` : ''}
+      ${history.length ? `
+        <div class="history-section" style="margin-top:${savedSearches.length?8:0}px">
+          <div class="history-label">🕐 Nedávné
+            <button id="clear-history">Smazat</button>
+          </div>
+          <div class="chip-row">${history.map(q => this._chipHtml(q, savedSearches.includes(q))).join('')}</div>
+        </div>` : ''}
+`;
+  },
+
+  _chipHtml(q, isSaved) {
+    return `<div class="chip" data-query="${escHtml(q)}">
+      🕐 ${escHtml(q)}
+      <span class="chip__star ${isSaved ? 'saved' : ''}" data-star="${escHtml(q)}">${isSaved ? '★' : '☆'}</span>
+    </div>`;
+  },
+
+  _attachSearchEvents() {
+    const inp = document.getElementById('search-input');
+    const clr = document.getElementById('search-clear');
+    const res = document.getElementById('search-results');
+    let debounce;
+
+    inp?.addEventListener('input', () => {
+      const q = inp.value;
+      clr?.classList.toggle('visible', !!q);
+      this._searchState.query = q;
+      clearTimeout(debounce);
+      debounce = setTimeout(() => { if (q.trim()) this._doSearch(q); else this.renderSearch(); }, 450);
+    });
+    inp?.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(debounce); this._doSearch(inp.value); } });
+    clr?.addEventListener('click', () => { inp.value = ''; this._searchState.query = ''; clr.classList.remove('visible'); this.renderSearch(); });
+
+    document.getElementById('filter-toggle')?.addEventListener('click', () => {
+      this._searchState.showFilters = !this._searchState.showFilters;
+      document.getElementById('filter-panel')?.classList.toggle('open', this._searchState.showFilters);
+      const btn = document.getElementById('filter-toggle');
+      if (btn) btn.textContent = this._searchState.showFilters ? '▲ Filtry' : '▼ Filtry';
+    });
+
+    // Sort inline toggle buttons — click once = activate that sort desc, click again = flip direction
+    document.querySelectorAll('.sort-inline-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const group = btn.dataset.sortGroup;
+        const cur = this._searchState.sortBy;
+        let next;
+        if (group === 'rating') next = cur === 'rating_desc' ? 'rating_asc' : 'rating_desc';
+        else if (group === 'year')  next = cur === 'year_desc'   ? 'year_asc'   : 'year_desc';
+        else if (group === 'title') next = cur === 'title_az'    ? 'title_za'   : 'title_az';
+        this._searchState.sortBy = next;
+        // Update active state of all sort buttons
+        document.querySelectorAll('.sort-inline-btn').forEach(b => {
+          const g = b.dataset.sortGroup;
+          const s = this._searchState.sortBy;
+          const active = (g === 'rating' && (s === 'rating_desc' || s === 'rating_asc'))
+                      || (g === 'year'   && (s === 'year_desc'   || s === 'year_asc'))
+                      || (g === 'title'  && (s === 'title_az'    || s === 'title_za'));
+          b.classList.toggle('active', active);
+          if (g === 'rating') b.textContent = `★ ${s === 'rating_asc' ? '↑' : '↓'}`;
+          if (g === 'year')   b.textContent = `📅 ${s === 'year_asc' ? '↑' : '↓'}`;
+          if (g === 'title')  b.textContent = `A ${s === 'title_za' ? '↓' : '↑'}`;
+        });
+        this._doSearch(this._searchState.query || '');
+      });
+    });
+
+    // Filters
+    const setFilter = (key, val) => { this._searchState.filters[key] = val; this._doSearch(this._searchState.query || ''); };
+
+    document.querySelectorAll('[data-type]').forEach(el => el.addEventListener('click', () => {
+      document.querySelectorAll('[data-type]').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      setFilter('searchTV', el.dataset.type === 'tv');
+    }));
+
+    document.getElementById('sort-select')?.addEventListener('change', e => { this._searchState.sortBy = e.target.value; if (this._searchState.query || Object.values(this._searchState.filters).some(Boolean)) this._doSearch(this._searchState.query || ''); });
+
+    const setupRange = (id, valId, key, fmt) => {
+      const el = document.getElementById(id);
+      const vl = document.getElementById(valId);
+      el?.addEventListener('input', () => { const v = parseFloat(el.value); vl.textContent = fmt ? fmt(v) : v; setFilter(key, v > 0 ? v : null); });
+    };
+    setupRange('year-from', 'year-from-val', 'yearFrom', v => v > 1950 ? v : 'Vše');
+    setupRange('year-to', 'year-to-val', 'yearTo', v => v < new Date().getFullYear() ? v : 'Vše');
+    setupRange('min-rating', 'min-rating-val', 'minRating', v => v > 0 ? v.toFixed(1) : 'Vše');
+    const maxEl = document.getElementById('max-results');
+    const maxVl = document.getElementById('max-results-val');
+    maxEl?.addEventListener('input', () => {
+      const v = parseInt(maxEl.value);
+      maxVl.textContent = v * 20;
+      this._searchState.maxPages = v;
+      // Don't auto-search on drag — only when user releases
+    });
+    maxEl?.addEventListener('change', () => {
+      if (this._searchState.query || Object.values(this._searchState.filters).some(Boolean))
+        this._doSearch(this._searchState.query || '');
+    });
+
+    document.getElementById('reset-filters')?.addEventListener('click', () => {
+      this._searchState.filters = {};
+      this._searchState.query = '';
+      this.renderSearch();
+    });
+
+    document.getElementById('genre-filter-chips')?.addEventListener('click', e => {
+      const chip = e.target.closest('[data-genre]');
+      if (!chip) return;
+      // Always store as int or null — never as string
+      const raw = chip.dataset.genre;
+      const clickedId = raw ? parseInt(raw) : null;
+      const current = this._searchState.filters.genreId;
+      // Toggle: clicking active genre clears it
+      const newId = (current === clickedId && clickedId !== null) ? null : clickedId;
+      this._searchState.filters.genreId = newId;
+      // Update active chips
+      document.querySelectorAll('#genre-filter-chips [data-genre]').forEach(c => c.classList.remove('active'));
+      const selector = newId === null ? '[data-genre=""]' : '[data-genre="' + newId + '"]';
+      document.querySelector('#genre-filter-chips ' + selector)?.classList.add('active');
+      // Always trigger search (even with no query — discover mode works fine with empty query)
+      this._doSearch(this._searchState.query || '');
+    });
+
+
+
+    // History + chips
+    res?.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      const star = e.target.closest('[data-star]');
+      const clrH = e.target.closest('#clear-history');
+      const sug = e.target.closest('.suggestion');
+
+      if (star) { e.stopPropagation(); Storage.toggleSavedSearch(star.dataset.star); this.renderSearch(); return; }
+      if (chip) { const q = chip.dataset.query; inp.value = q; this._searchState.query = q; this._doSearch(q); return; }
+
+      if (clrH) { Storage.clearHistory(); this.renderSearch(); return; }
+      if (sug) { inp.value = sug.textContent; this._searchState.query = sug.textContent; this._doSearch(sug.textContent); return; }
+    });
+
+
+  },
+
+  _sortMovies(movies, sortBy) {
+    const m = [...movies];
+    if (sortBy === 'rating_desc') m.sort((a,b) => b.rating - a.rating);
+    else if (sortBy === 'rating_asc')  m.sort((a,b) => a.rating - b.rating);
+    else if (sortBy === 'year_desc')   m.sort((a,b) => (b.year||'').localeCompare(a.year||''));
+    else if (sortBy === 'year_asc')    m.sort((a,b) => (a.year||'').localeCompare(b.year||''));
+    else if (sortBy === 'title_az')    m.sort((a,b) => a.title.localeCompare(b.title, 'cs'));
+    else if (sortBy === 'title_za')    m.sort((a,b) => b.title.localeCompare(a.title, 'cs'));
+    return m;
+  },
+
+  async _doSearch(query) {
+    const st = this._searchState;
+    const res = document.getElementById('search-results');
+    if (!res || st.loading) return;
+    st.loading = true;
+    res.innerHTML = spinner('Hledám...');
+    try {
+      if (query.trim()) Storage.addToHistory(query.trim());
+
+      const PAGES = st.maxPages || 10;
+      const pageNums = Array.from({ length: PAGES }, (_, i) => i + 1);
+      const results = await Promise.allSettled(pageNums.map(p =>
+        API.searchMovies(query, {
+          yearFrom: st.filters.yearFrom, yearTo: st.filters.yearTo,
+          genreId: st.filters.genreId, minRating: st.filters.minRating,
+          searchTV: st.filters.searchTV, page: p,
+        })
+      ));
+      const seen = new Set();
+      let movies = [];
+      for (const r of results) {
+        if (r.status !== 'fulfilled') continue;
+        for (const m of r.value) {
+          if (!seen.has(m.imdbId)) { seen.add(m.imdbId); movies.push(m); }
+        }
+      }
+      movies = this._sortMovies(movies, st.sortBy);
+
+      if (!movies.length) {
+        res.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">🔍</div>
+            <div class="empty-state__title">Žádné výsledky pro "${escHtml(query)}"</div>
+            <div class="empty-state__sub">Zkus toto:</div>
+            <div class="suggestions">
+              ${['Batman','Marvel','Disney','Horror','Action','Comedy'].map(s => `<div class="suggestion">${s}</div>`).join('')}
+            </div>
+          </div>`;
+        return;
+      }
+
+      const isBulk = st.bulkMode;
+      const selected = st.bulkSelected;
+
+      res.innerHTML = `
+        <div style="padding:8px 16px 4px;font-size:12px;color:var(--text3)">${movies.length} výsledků</div>
+        <div class="bulk-toolbar ${isBulk ? '' : 'hidden'}" id="bulk-toolbar">
+          <span style="color:var(--text2);font-size:13px">Vybráno: <strong id="bulk-count">0</strong></span>
+          <button class="btn btn--primary btn--sm" id="bulk-add-btn">+ Přidat vybrané</button>
+          <button class="btn btn--ghost btn--sm" id="bulk-cancel">Zrušit</button>
+        </div>
+        <div class="movie-grid" id="search-grid">
+          ${movies.map(m => `
+            <div class="movie-card-wrap" data-id="${m.imdbId}">
+              ${movieCard(m, { highlight: query })}
+              ${isBulk ? `<div class="bulk-check ${selected.has(m.imdbId)?'active':''}" style="position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:${selected.has(m.imdbId)?'var(--accent)':'rgba(0,0,0,.5)'};border:2px solid white;display:flex;align-items:center;justify-content:center;font-size:11px">${selected.has(m.imdbId)?'✓':''}</div>` : ''}
+            </div>`).join('')}
+        </div>`;
+
+      attachCardEvents(res);
+
+      if (isBulk) {
+        const updateBulkCount = () => { document.getElementById('bulk-count').textContent = selected.size; };
+        document.getElementById('search-grid')?.addEventListener('click', e => {
+          const wrap = e.target.closest('.movie-card-wrap');
+          if (!wrap) return;
+          const id = wrap.dataset.id;
+          if (selected.has(id)) selected.delete(id); else selected.add(id);
+          const chk = wrap.querySelector('.bulk-check');
+          if (chk) { chk.style.background = selected.has(id) ? 'var(--accent)' : 'rgba(0,0,0,.5)'; chk.textContent = selected.has(id) ? '✓' : ''; }
+          updateBulkCount();
+        });
+        document.getElementById('bulk-add-btn')?.addEventListener('click', async () => {
+          for (const id of selected) {
+            const m = movies.find(x => x.imdbId === id);
+            if (m) Storage.saveFavorite(m);
+          }
+          document.dispatchEvent(new CustomEvent('favorites-changed'));
+          showToast(`🔖 ${selected.size} filmů přidáno`);
+          selected.clear();
+          updateBulkCount();
+        });
+        document.getElementById('bulk-cancel')?.addEventListener('click', () => {
+          st.bulkMode = false; selected.clear(); this._doSearch(query);
+        });
+      }
+    } catch(e) {
+      console.error('Search error', e);
+      if (res) res.innerHTML = `<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Chyba při hledání</div></div>`;
+    } finally {
+      st.loading = false;
+    }
+  },
+
+  // ════════════════════════════════════════════════
+  //  FAVORITES
+  // ════════════════════════════════════════════════
+  _favState: { sortBy: 'added', filterLabel: null, filterCollection: null, calendarView: false, showStats: false },
+
+  renderFavorites() {
+    const s = document.getElementById('screen');
+    const st = this._favState;
+    const favs = Storage.getFavorites();
+    const watchedIds = Storage.getWatchedIds();
+    const stats = Storage.getStats();
+    const progress = stats.total > 0 ? stats.watched / stats.total : 0;
+    const collections = Storage.getCollections();
+    const labels = Storage.getLabels();
+    const ratings = Storage.getAllRatings();
+    const genres = this.genreCache;
+
+    // Filter + sort
+    let filtered = [...favs];
+    if (st.filterCollection) {
+      const col = collections.find(c => c.id === st.filterCollection);
+      if (col) filtered = filtered.filter(m => col.movieIds.includes(m.imdbId));
+    }
+    if (st.filterLabel) filtered = filtered.filter(m => labels[m.imdbId] === st.filterLabel);
+    if (st.sortBy === 'title')   filtered.sort((a,b) => a.title.localeCompare(b.title));
+    if (st.sortBy === 'rating')  filtered.sort((a,b) => (ratings[b.imdbId]||0) - (ratings[a.imdbId]||0));
+    if (st.sortBy === 'year')    filtered.sort((a,b) => b.year.localeCompare(a.year));
+    if (st.sortBy === 'watched') filtered.sort((a,b) => (watchedIds.has(a.imdbId)?1:0) - (watchedIds.has(b.imdbId)?1:0));
+
+    const topGenre = stats.topGenreId ? genres.find(g => g.id === stats.topGenreId)?.name || '?' : '?';
+
+    s.innerHTML = `
+      <div class="favs-header">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px">
+          <h2 style="flex:1;font-size:16px;font-weight:800">❤️ Moje oblíbené</h2>
+          <button class="btn btn--icon" id="btn-random-unseen" title="Náhodný neshlédnutý">🎲</button>
+          <button class="btn btn--icon" id="btn-calendar" title="Kalendář">${st.calendarView?'🔲':'📅'}</button>
+          <button class="btn btn--icon" id="btn-stats" title="Statistiky">📊</button>
+          <button class="btn btn--icon" id="btn-share" title="Sdílet">🔗</button>
+          <button class="btn btn--icon" id="btn-new-col" title="Nová kolekce">📁+</button>
+          <button class="btn btn--icon" id="btn-new-label" title="Nový štítek">🏷️+</button>
+        </div>
+        ${stats.total > 0 ? `
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-label">
+              <span>${stats.watched} / ${stats.total} viděno</span>
+              <span style="color:var(--accent);font-weight:700">${Math.round(progress*100)}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-bar__fill" style="width:${progress*100}%"></div></div>
+          </div>` : ''}
+        <div class="favs-toolbar">
+          <select class="sort-select" id="fav-sort">
+            <option value="added"   ${st.sortBy==='added'  ?'selected':''}>Datum přidání</option>
+            <option value="title"   ${st.sortBy==='title'  ?'selected':''}>Název A-Z</option>
+            <option value="rating"  ${st.sortBy==='rating' ?'selected':''}>Moje hodnocení</option>
+            <option value="year"    ${st.sortBy==='year'   ?'selected':''}>Rok</option>
+            <option value="watched" ${st.sortBy==='watched'?'selected':''}>Neshlédnuté první</option>
+          </select>
+          <span style="margin-left:auto;color:var(--accent);font-size:12px;font-weight:600">${movieCountLabel(filtered.length)}</span>
+        </div>
+      </div>
+
+      <!-- Stats panel -->
+      <div class="stats-panel ${st.showStats?'open':''}" id="stats-panel">
+        <div class="stats-grid">
+          ${[['Celkem',stats.total],['Viděno',stats.watched],['Zbývá',stats.notWatched],
+             ['Ø hodnocení',stats.avgRating>0?stats.avgRating.toFixed(1):'-'],
+             ['Ø rok',stats.avgYear||'-'],['Top žánr',topGenre]
+            ].map(([l,v]) => `<div class="stat-item"><div class="stat-item__val">${v}</div><div class="stat-item__label">${l}</div></div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Collections -->
+      ${collections.length ? `
+        <div class="collections-row">
+          <div class="col-chip ${!st.filterCollection?'active':''}" data-col="">📚 Vše</div>
+          ${collections.map(c => `
+            <div class="col-chip ${st.filterCollection===c.id?'active':''}" data-col="${c.id}">
+              ${escHtml(c.name)}
+              <span class="col-chip__del" data-del="${c.id}">✕</span>
+            </div>`).join('')}
+        </div>` : ''}
+
+      <!-- Label filters -->
+      <div class="labels-row">
+        <div class="label-filter ${!st.filterLabel?'active':''}" data-label=""
+             style="background:rgba(255,255,255,.08);color:var(--text2);border-color:${!st.filterLabel?'var(--accent)':'transparent'}">Vše</div>
+        ${Object.entries(getAllLabelDefs()).filter(([key]) => !getHiddenLabelKeys().has(key)).map(([key, def]) => {
+          const isCustom = key.startsWith('custom_');
+          return `<div class="label-filter ${st.filterLabel===key?'active':''}" data-label="${key}"
+               style="background:${def.color}22;color:${def.color};border-color:${st.filterLabel===key?def.color:'transparent'}">
+            ${def.label}
+            <span class="label-del-btn" data-del-label="${key}" title="Smazat štítek" style="margin-left:6px;opacity:.5;font-size:11px;cursor:pointer;line-height:1">✕</span>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Content -->
+      <div id="favs-content">
+        ${filtered.length === 0 && favs.length === 0 ? this._emptyFavs() :
+          filtered.length === 0 ? '<div class="empty-state"><div class="empty-state__icon">🔍</div><div class="empty-state__title">Žádné filmy v tomto filtru</div></div>' :
+          st.calendarView ? this._buildCalendarView(filtered) :
+          `<div class="movie-grid">
+            ${filtered.map(m => `
+              <div class="movie-card-wrap" data-id="${m.imdbId}">
+                ${movieCard(m, { ctxBtn: { id: m.imdbId, data: JSON.stringify(m) }, watchedToggle: true })}
+              </div>`).join('')}
+          </div>`}
+      </div>`;
+
+    this._attachFavEvents(filtered, collections);
+  },
+
+  _emptyFavs() {
+    return `<div class="empty-state">
+      <div class="empty-state__icon">🎬</div>
+      <div class="empty-state__title">Ještě žádné oblíbené</div>
+      <div class="empty-state__sub">Klikni na 🔖 u libovolného filmu nebo prozkoumej sekci Bored 😴</div>
+    </div>`;
+  },
+
+  _buildCalendarView(movies) {
+    const grouped = {};
+    for (const m of movies) {
+      const key = m.year || 'Neznámý';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(m);
+    }
+    const sorted = Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0]));
+    return `<div class="calendar-view">` + sorted.map(([year, mms]) => `
+      <div class="cal-year">${year}</div>
+      <div class="cal-row">
+        ${mms.map(m => `<div style="flex-shrink:0;width:100px">${movieCard(m, { watchedToggle: true })}</div>`).join('')}
+      </div>`).join('') + '</div>';
+  },
+
+  _attachFavEvents(filtered, collections) {
+    const st = this._favState;
+
+    document.getElementById('fav-sort')?.addEventListener('change', e => { st.sortBy = e.target.value; this.renderFavorites(); });
+    document.getElementById('btn-random-unseen')?.addEventListener('click', () => {
+      const watchedIds = Storage.getWatchedIds();
+      const unseen = filtered.filter(m => !watchedIds.has(m.imdbId));
+      if (!unseen.length) { showToast('🎉 Všechny filmy jsi viděl!'); return; }
+      openMovieDetail(unseen[Math.floor(Math.random() * unseen.length)]);
+    });
+    document.getElementById('btn-calendar')?.addEventListener('click', () => { st.calendarView = !st.calendarView; this.renderFavorites(); });
+    document.getElementById('btn-stats')?.addEventListener('click', () => { st.showStats = !st.showStats; document.getElementById('stats-panel')?.classList.toggle('open', st.showStats); });
+    document.getElementById('btn-share')?.addEventListener('click', async () => {
+      const token = Storage.generateShareToken();
+      const url = `${location.href.split('#')[0]}#share=${token}`;
+      await navigator.clipboard?.writeText(url);
+      showToast('🔗 Link zkopírován do schránky!');
+    });
+    document.getElementById('btn-new-col')?.addEventListener('click', async () => {
+      const name = await promptDialog('Název nové kolekce:', 'např. Akce na víkend');
+      if (name) { Storage.createCollection(name); this.renderFavorites(); }
+    });
+    // FIX #27: create custom label
+    document.getElementById('btn-new-label')?.addEventListener('click', () => {
+      const colors = ['#E53935','#FF6D00','#F9A825','#43A047','#00ACC1','#1E88E5','#5E35B1','#EC407A','#546E7A'];
+      const emojis = ['🔴','🟠','🟡','🟢','🔵','🟣','🏷️','⭐','🎯','🎬','💡','🔥','❤️','👑','🎁','⚡','🌙','🎭'];
+      const overlay = showModal(`
+        <div style="padding:4px">
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Název štítku</label>
+          <input class="input" id="_lbl-name" placeholder="např. Romantický večer" style="margin-bottom:14px">
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Ikona</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="_lbl-emojis">
+            ${emojis.map((em,i) => `<div data-emoji="${em}" style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:2px solid ${i===0?'var(--accent)':'transparent'};background:rgba(255,255,255,.06);transition:all .15s">${em}</div>`).join('')}
+          </div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Barva</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="_lbl-colors">
+            ${colors.map((col,i) => `<div data-color="${col}" style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;border:3px solid ${i===0?'#fff':'transparent'};transition:border-color .15s"></div>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn--ghost btn--sm" onclick="this.closest('.modal-overlay').remove()">Zrušit</button>
+            <button class="btn btn--primary btn--sm" id="_lbl-save">Vytvořit</button>
+          </div>
+        </div>`, { title: '🏷️ Nový štítek' });
+      let selectedColor = colors[0];
+      let selectedEmoji = emojis[0];
+      overlay.querySelectorAll('[data-color]').forEach(dot => {
+        dot.addEventListener('click', () => {
+          overlay.querySelectorAll('[data-color]').forEach(d => d.style.borderColor = 'transparent');
+          dot.style.borderColor = '#fff'; selectedColor = dot.dataset.color;
+        });
+      });
+      overlay.querySelectorAll('[data-emoji]').forEach(em => {
+        em.addEventListener('click', () => {
+          overlay.querySelectorAll('[data-emoji]').forEach(e => e.style.borderColor = 'transparent');
+          em.style.borderColor = 'var(--accent)'; selectedEmoji = em.dataset.emoji;
+        });
+      });
+      overlay.querySelector('#_lbl-save').addEventListener('click', () => {
+        const name = overlay.querySelector('#_lbl-name').value.trim();
+        if (!name) return;
+        const key = 'custom_' + Date.now();
+        saveCustomLabelDef(key, selectedColor, name, selectedEmoji);
+        overlay.remove();
+        this.renderFavorites();
+      });
+    });
+
+    // Collections
+    document.querySelector('.collections-row')?.addEventListener('click', e => {
+      const chip = e.target.closest('[data-col]');
+      const del = e.target.closest('[data-del]');
+      if (del) { e.stopPropagation(); Storage.deleteCollection(del.dataset.del); st.filterCollection = null; this.renderFavorites(); return; }
+      if (chip) { st.filterCollection = chip.dataset.col || null; this.renderFavorites(); }
+    });
+
+    // Label filter + delete
+    document.querySelector('.labels-row')?.addEventListener('click', e => {
+      const delBtn = e.target.closest('[data-del-label]');
+      if (delBtn) {
+        e.stopPropagation();
+        const key = delBtn.dataset.delLabel;
+        hideLabel(key); // works for both predefined and custom
+        if (st.filterLabel === key) st.filterLabel = null;
+        this.renderFavorites(); return;
+      }
+      const lf = e.target.closest('[data-label]');
+      if (lf) { st.filterLabel = lf.dataset.label || null; this.renderFavorites(); }
+    });
+
+    // Card events
+    const grid = document.getElementById('favs-content');
+    attachCardEvents(grid, { onCardClick: m => { openMovieDetail(m).then(() => this.renderFavorites()); } });
+    document.addEventListener('favorites-changed', () => {
+      if (this.currentScreen === 'favorites') this.renderFavorites();
+    }, { once: true });
+
+    // Context menu — dispatched from ui.js via custom event
+    document.addEventListener('card-ctx-menu', e => {
+      if (!document.getElementById('favs-content')) return; // only active on fav screen
+      this._showCtxMenu(e.detail.event, e.detail.movie, collections);
+    }, { once: false });
+    // Also handle direct clicks (fallback)
+    grid?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="ctx-menu"]');
+      if (!btn) return;
+      e.stopPropagation();
+      let movie; try { movie = JSON.parse(btn.dataset.movie || '{}'); } catch { return; }
+      this._showCtxMenu(e, movie, collections);
+    });
+  },
+
+  _showCtxMenu(e, movie, collections) {
+    document.querySelector('.ctx-menu')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'ctx-menu';
+    menu.innerHTML = `
+      <div class="ctx-menu-item" data-act="similar">✨ Podobné filmy</div>
+      <div class="ctx-menu-item" data-act="music">🎵 Soundtrack (YouTube)</div>
+      ${collections.length ? `<div class="ctx-menu-item" data-act="collection">📁 Do kolekce</div>` : ''}
+      <div class="ctx-menu-item" data-act="label">🏷️ Štítek</div>
+      <div class="ctx-menu-item" data-act="remove" style="color:var(--red)">🗑️ Odebrat</div>`;
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+    menu.style.top  = Math.min(e.clientY, window.innerHeight - 200) + 'px';
+    document.body.appendChild(menu);
+    const close = () => menu.remove();
+    setTimeout(() => document.addEventListener('click', close, { once: true }), 50);
+
+    menu.addEventListener('click', async ev => {
+      const act = ev.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      close();
+      if (act === 'similar') {
+        const overlay2 = showModal(`
+          <div id="_csim-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:14px 12px;padding:16px"></div>
+          <div id="_csim-sentinel" style="height:32px;display:flex;align-items:center;justify-content:center">
+            <div class="spinner" style="width:24px;height:24px;border-width:2px"></div>
+          </div>`, { title: `✨ Podobné: ${movie.title}`, wide: true });
+        const body = overlay2.querySelector('.modal-body');
+        let csimDone = false;
+        const loadCSim = async () => {
+          if (csimDone) return;
+          csimDone = true;
+          const similar = await API.getSmartSimilar(movie.id, movie.genreIds || []).catch(() => []);
+          const grid = overlay2.querySelector('#_csim-grid');
+          const sentinel = overlay2.querySelector('#_csim-sentinel');
+          if (sentinel) sentinel.remove();
+          if (!grid) return;
+          if (!similar.length) {
+            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🎬</div><div class="empty-state__title">Nic nenalezeno</div></div>`;
+          } else {
+            grid.innerHTML = similar.map(m => movieCard(m)).join('');
+            attachCardEvents(grid);
+          }
+        };
+        // Observe sentinel to load on first scroll-into-view (or immediately if visible)
+        if (body) {
+          const sentinel = overlay2.querySelector('#_csim-sentinel');
+          const obs = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) { obs.disconnect(); loadCSim(); }
+          }, { root: body });
+          if (sentinel) obs.observe(sentinel);
+          else loadCSim();
+        }
+      }
+      if (act === 'music') {
+        const q = encodeURIComponent(`${movie.title} ${movie.year} official soundtrack`);
+        window.open(`https://www.youtube.com/results?search_query=${q}`, '_blank');
+      }
+      if (act === 'collection') {
+        const opts = collections.map(c => `<div class="ctx-menu-item" data-col="${c.id}">${escHtml(c.name)}</div>`).join('');
+        const m2 = showModal(opts, { title: 'Přidat do kolekce' });
+        m2.querySelector('.modal-body').addEventListener('click', ev2 => {
+          const chip = ev2.target.closest('[data-col]');
+          if (chip) { Storage.addToCollection(chip.dataset.col, movie.imdbId); m2.remove(); showToast('📁 Přidáno do kolekce'); }
+        });
+      }
+      if (act === 'label') {
+        // FIX #8: inline label picker — quick color dots, no modal
+        const existingPicker = document.getElementById('label-quick-picker');
+        if (existingPicker) existingPicker.remove();
+        const allLabelDefs = getAllLabelDefs();
+        const picker = document.createElement('div');
+        picker.id = 'label-quick-picker';
+        picker.style.cssText = `position:fixed;left:${Math.min(e.clientX, window.innerWidth-220)}px;top:${Math.min(e.clientY + 8, window.innerHeight-280)}px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:600;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:200px;max-height:320px;overflow-y:auto`;
+        const currentLabel = Storage.getLabels()[movie.imdbId];
+        picker.innerHTML = `<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700">Přiřadit štítek</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            ${Object.entries(allLabelDefs).map(([k,d]) => `
+              <div data-lbl="${k}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:background .15s;background:${currentLabel===k?d.color+'22':'transparent'};border:1px solid ${currentLabel===k?d.color:'transparent'}">
+                <span style="width:12px;height:12px;border-radius:50%;background:${d.color};flex-shrink:0;display:inline-block"></span>
+                <span style="font-size:13px;font-weight:600;color:var(--text)">${d.label.replace(/^[^ ]+ /,'')}</span>
+                ${currentLabel===k?'<span style="margin-left:auto;font-size:11px;color:'+d.color+'">✓</span>':''}
+              </div>`).join('')}
+            <div data-lbl="" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:background .15s;color:var(--text3);font-size:13px">
+              <span style="width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;display:inline-block;display:flex;align-items:center;justify-content:center;font-size:9px">✕</span>
+              <span>Odebrat štítek</span>
+            </div>
+          </div>`;
+        document.body.appendChild(picker);
+        // Hover highlight
+        picker.querySelectorAll('[data-lbl]').forEach(row => {
+          row.addEventListener('mouseenter', () => { row.style.background = 'var(--surface2)'; });
+          row.addEventListener('mouseleave', () => {
+            const k = row.dataset.lbl;
+            const cl = Storage.getLabels()[movie.imdbId];
+            const d = k ? getAllLabelDefs()[k] : null;
+            row.style.background = (k && cl === k) ? (d.color + '22') : 'transparent';
+          });
+        });
+        const closePicker = () => picker.remove();
+        setTimeout(() => document.addEventListener('click', closePicker, { once: true }), 50);
+        picker.addEventListener('click', ev2 => {
+          const row = ev2.target.closest('[data-lbl]');
+          if (row !== null) { ev2.stopPropagation(); Storage.setLabel(movie.imdbId, row.dataset.lbl); picker.remove(); this.renderFavorites(); }
+        });
+      }
+      if (act === 'remove') {
+        Storage.removeFavorite(movie.imdbId);
+        document.dispatchEvent(new CustomEvent('favorites-changed'));
+        showToast(`❌ ${movie.title} odebrán`);
+        this.renderFavorites();
+      }
+    });
+  },
+
+  // ════════════════════════════════════════════════
+  //  BORED
+  // ════════════════════════════════════════════════
+  _boredOpts: { genreId: null, decade: null, spotlightMode: false, showHeatmap: false },
+
+  renderBored() {
+    const s = document.getElementById('screen');
+    // Override full screen
+    s.style.overflow = 'hidden';
+    s.style.height = '100%';
+    const decades = ['1970','1980','1990','2000','2010','2020'];
+    s.innerHTML = `
+      <div class="bored-screen">
+        <div class="bored-topbar">
+          <button class="btn btn--icon" id="bored-back">←</button>
+          <div class="bored-topbar__title">Sledov<span>á</span>tko</div>
+          <button class="btn btn--icon" id="bored-shuffle" title="Nová sada">🔀</button>
+        </div>
+        <div class="bored-filters">
+          <div class="bored-filter active" data-filter="">✨ Vše</div>
+          <div class="bored-filter" data-roulette="">🎡 Ruleta</div>
+          ${decades.map(d => `<div class="bored-filter" data-decade="${d}">${d}s</div>`).join('')}
+          ${this.genreCache.slice(0,10).map(g =>
+            `<div class="bored-filter" data-genre="${g.id}">${GENRE_EMOJIS[g.id]||'🎬'} ${g.name}</div>`
+          ).join('')}
+        </div>
+        <div class="bored-canvas-wrap">
+          <div id="bored-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--text2)">
+            <div class="spinner"></div>
+            <div>Načítám filmy ze světa...</div>
+          </div>
+          <canvas id="bored-canvas" style="display:none"></canvas>
+        </div>
+      </div>`;
+
+    document.getElementById('bored-back').addEventListener('click', () => {
+      s.style.overflow = '';
+      s.style.height = '';
+      this.navigate('home');
+    });
+
+    const opts = this._boredOpts;
+
+    document.getElementById('bored-shuffle').addEventListener('click', () => this._loadBoredMovies());
+
+    // Filters
+    document.querySelector('.bored-filters').addEventListener('click', async e => {
+      const f = e.target.closest('[data-filter],[data-decade],[data-genre],[data-roulette]');
+      if (!f) return;
+      document.querySelectorAll('.bored-filter').forEach(x => x.classList.remove('active'));
+      f.classList.add('active');
+
+      if ('roulette' in f.dataset) {
+        this._showGenreRoulette();
+        return;
+      }
+      opts.genreId = f.dataset.genre ? parseInt(f.dataset.genre) : null;
+      opts.decade  = f.dataset.decade || null;
+      this._loadBoredMovies();
+    });
+
+    this._loadBoredMovies();
+  },
+
+  _boredMovies: [],
+
+  async _loadBoredMovies() {
+    const opts = this._boredOpts;
+    document.getElementById('bored-loading').style.display = 'flex';
+    document.getElementById('bored-canvas').style.display = 'none';
+    if (this._boredGrid) { this._boredGrid.destroy(); this._boredGrid = null; }
+    try {
+      const movies = await API.getBoredMovies({ genreId: opts.genreId, decade: opts.decade });
+      this._boredMovies = movies;
+      const canvas = document.getElementById('bored-canvas');
+      document.getElementById('bored-loading').style.display = 'none';
+      canvas.style.display = 'block';
+      this._boredGrid = new BoredGrid(canvas, movies, {
+        spotlightMode: opts.spotlightMode,
+        showHeatmap: opts.showHeatmap,
+        onSelect: (movie) => openMovieDetail(movie),
+      });
+    } catch(e) {
+      document.getElementById('bored-loading').innerHTML = '<div style="text-align:center"><div style="font-size:48px">⚠️</div><div>Chyba při načítání</div></div>';
+    }
+  },
+
+  _showGenreRoulette() {
+    if (!this.genreCache.length) return;
+    let current = this.genreCache[Math.floor(Math.random() * this.genreCache.length)];
+    let spinning = false;
+    const overlay = showModal(`
+      <div style="text-align:center;padding:16px">
+        <div id="roulette-emoji" style="font-size:72px;transition:transform .1s">${GENRE_EMOJIS[current.id]||'🎬'}</div>
+        <div id="roulette-name" style="font-size:22px;font-weight:800;margin:12px 0">${current.name}</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+          <button class="btn btn--ghost" id="roulette-spin">🎲 Točit!</button>
+          <button class="btn btn--primary" id="roulette-pick">Vybrat tento</button>
+        </div>
+      </div>`, { title: '🎡 Ruleta žánrů' });
+
+    document.getElementById('roulette-spin').addEventListener('click', () => {
+      if (spinning) return;
+      spinning = true;
+      let count = 0, max = 15 + Math.floor(Math.random() * 10);
+      const interval = setInterval(() => {
+        current = this.genreCache[Math.floor(Math.random() * this.genreCache.length)];
+        document.getElementById('roulette-emoji').textContent = GENRE_EMOJIS[current.id]||'🎬';
+        document.getElementById('roulette-name').textContent = current.name;
+        count++;
+        if (count >= max) { clearInterval(interval); spinning = false; }
+      }, 80 + count * 8);
+    });
+    document.getElementById('roulette-pick').addEventListener('click', () => {
+      overlay.remove();
+      this._boredOpts.genreId = current.id;
+      this._boredOpts.decade = null;
+      this._loadBoredMovies();
+    });
+  },
+
+  // ════════════════════════════════════════════════
+  //  HOT OR NOT landing
+  // ════════════════════════════════════════════════
+  async renderHotOrNotLanding() {
+    const s = document.getElementById('screen');
+    s.innerHTML = `
+      <div style="padding:24px;max-width:480px;margin:0 auto">
+        <h2 style="font-size:22px;font-weight:900;margin-bottom:8px">🔥 Hot or Not</h2>
+        <p style="color:var(--text2);margin-bottom:24px">Procházej filmy rychle — ukládej nebo přeskakuj. Na konci uvidíš co jsi vybral.</p>
+        <button class="btn btn--primary" id="hon-popular" style="padding:16px;font-size:15px;border-radius:14px;width:100%">🌍 Spustit</button>
+        <p style="color:var(--text3);font-size:12px;margin-top:20px;text-align:center">Tip: Klikni na film pro detail, nebo použij tlačítka</p>
+      </div>`;
+    document.getElementById('hon-popular').addEventListener('click', async () => {
+      s.innerHTML = spinner('Připravuji náhodné filmy...');
+      // FIX #12: fetch truly random movies from random pages
+      try {
+        const pages = Array.from({length: 5}, (_, i) => Math.floor(Math.random() * 100) + 1);
+        const results = await Promise.all(pages.map(p =>
+          fetch(`https://api.themoviedb.org/3/discover/movie?language=cs-CZ&sort_by=vote_count.desc&vote_average.gte=5&page=${p}`,
+            { headers: { 'Authorization': 'Bearer ' + API.getToken() } }).then(r => r.json())
+        ));
+        let movies = results.flatMap(d => (d.results || []).filter(m => m.poster_path).map(m => ({
+          id: m.id, title: m.title || m.name || '?',
+          year: (m.release_date || '').substring(0,4), imdbId: String(m.id),
+          posterUrl: `https://image.tmdb.org/t/p/w342${m.poster_path}`,
+          backdropUrl: m.backdrop_path ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}` : '',
+          rating: (m.vote_count || 0) >= 10 ? (m.vote_average || 0) : 0,
+          overview: m.overview || '', genreIds: m.genre_ids || [],
+          releaseDate: m.release_date || '', mediaType: 'movie',
+        })));
+        // Shuffle
+        movies = movies.sort(() => Math.random() - 0.5);
+        this.renderHotOrNot(movies);
+      } catch { showToast('Chyba při načítání filmů'); }
+    });
+
+  },
+
+  // ════════════════════════════════════════════════
+  //  HOT OR NOT
+  // ════════════════════════════════════════════════
+  renderHotOrNot(movies) {
+    const s = document.getElementById('screen');
+    s.style.overflow = 'hidden';
+    s.style.height = '100%';
+    let current = 0;
+    const saved = [], skipped = [];
+    let animating = false;
+
+    const render = () => {
+      const isDone = current >= movies.length;
+      s.innerHTML = `
+        <div class="hon-screen">
+          <div class="hon-progress"><div class="hon-progress__fill" style="width:${current/movies.length*100}%"></div></div>
+          ${isDone ? `
+            <div class="hon-done">
+              <div class="hon-done__emoji">🎉</div>
+              <div class="hon-done__title">Hotovo!</div>
+              <div style="color:var(--accent);font-size:16px;font-weight:700">Uloženo: ${saved.length} filmů</div>
+              <div style="color:var(--text2)">Přeskočeno: ${skipped.length}</div>
+              ${saved.length ? `<div class="hon-done__picks">
+                ${saved.map(m => m.posterUrl ? `<img src="${m.posterUrl}" alt="${escHtml(m.title)}">` : '').join('')}
+              </div>` : ''}
+              <button class="btn btn--primary" id="hon-back">← Zpět do Bored</button>
+            </div>` : `
+            <div style="padding:8px 16px;text-align:right;color:var(--text3);font-size:13px;flex-shrink:0">${current+1} / ${movies.length}</div>
+            <div class="hon-card-area">
+              <div class="hon-card" id="hon-card">
+                ${movies[current].posterUrl ? `<img class="hon-card__img" src="${movies[current].posterUrl}" alt="">` : '<div style="width:100%;height:100%;background:var(--surface2)"></div>'}
+                <div class="hon-card__overlay"></div>
+                <div class="hon-card__info">
+                  <div class="hon-card__title">${escHtml(movies[current].title)}</div>
+                  <div class="hon-card__sub">${movies[current].year}${movies[current].rating>0?' · ★ '+movies[current].rating.toFixed(1):''}</div>
+                  ${movies[current].overview ? `<div class="hon-card__overview">${escHtml(movies[current].overview)}</div>` : ''}
+                </div>
+                <div class="hon-verdict" id="hon-verdict"></div>
+              </div>
+            </div>
+            <div class="hon-btns">
+              <div class="hon-btn hon-btn--skip" id="hon-skip">
+                <div class="hon-btn__circle">👎</div>
+                <div class="hon-btn__label">Přeskočit</div>
+              </div>
+              <div class="hon-btn hon-btn--detail" id="hon-detail">
+                <div class="hon-btn__circle">ℹ️</div>
+                <div class="hon-btn__label">Detail</div>
+              </div>
+              <div class="hon-btn hon-btn--save" id="hon-save">
+                <div class="hon-btn__circle">🔥</div>
+                <div class="hon-btn__label">Uložit</div>
+              </div>
+            </div>`}
+        </div>`;
+
+      if (isDone) {
+        document.getElementById('hon-back').addEventListener('click', () => {
+          s.style.overflow = ''; s.style.height = '';
+          this.navigate('hotnot');
+        });
+        return;
+      }
+
+      const decide = async (hot) => {
+        if (animating) return;
+        animating = true;
+        const card = document.getElementById('hon-card');
+        const verdict = document.getElementById('hon-verdict');
+        verdict.textContent = hot ? '🔥' : '👎';
+        verdict.className = `hon-verdict ${hot ? 'hot' : 'skip'} visible`;
+        card.className = `hon-card ${hot ? 'slide-right' : 'slide-left'}`;
+        if (hot) { Storage.saveFavorite(movies[current]); saved.push(movies[current]); document.dispatchEvent(new CustomEvent('favorites-changed')); }
+        else skipped.push(movies[current]);
+        await new Promise(r => setTimeout(r, 350));
+        current++;
+        animating = false;
+        render();
+      };
+
+      document.getElementById('hon-skip').addEventListener('click', () => decide(false));
+      document.getElementById('hon-save').addEventListener('click', () => decide(true));
+      document.getElementById('hon-detail').addEventListener('click', () => openMovieDetail(movies[current]));
+      document.getElementById('hon-card').addEventListener('click', () => openMovieDetail(movies[current]));
+    };
+    render();
+  },
+
+  // ════════════════════════════════════════════════
+  //  KINO VEČER
+  // ════════════════════════════════════════════════
+  async renderKinoVecer(fromSaved = false) {
+    const s = document.getElementById('screen');
+    s.innerHTML = `
+      <div class="kv-screen">
+        <button class="btn btn--ghost btn--sm" id="kv-back">← Zpět</button>
+        <h2 style="margin:16px 0 8px;font-size:20px;font-weight:800">🎬 Kino večer</h2>
+        <div class="kv-intro">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:28px">🍿</div>
+            <div>
+              <div style="color:var(--text2);font-size:12px">Připravili jsme pro tebe</div>
+              <div style="font-weight:800;font-size:15px">dokonalý filmový večer</div>
+            </div>
+          </div>
+          <div id="kv-theme-badge"></div>
+          <div id="kv-anchor"></div>
+        </div>
+        <div class="kv-source-btns">
+          <button class="kv-source-btn ${!fromSaved?'active':''}" id="kv-from-recommended">🌍 Z doporučených</button>
+          <button class="kv-source-btn ${fromSaved?'active':''}" id="kv-from-saved">❤️ Z mých oblíbených</button>
+        </div>
+        <div id="kv-movies">${spinner('Skládám dokonalý večer...')}</div>
+        <div class="kv-actions">
+          <button class="btn btn--ghost" id="kv-refresh">🔀 Jiný program</button>
+          <button class="btn btn--primary" id="kv-save-all">🔖 Uložit vše</button>
+        </div>
+      </div>`;
+
+    document.getElementById('kv-back').addEventListener('click', () => this.renderBored());
+    document.getElementById('kv-from-recommended').addEventListener('click', () => this.renderKinoVecer(false));
+    document.getElementById('kv-from-saved').addEventListener('click', () => this.renderKinoVecer(true));
+
+    let currentPicks = [];
+
+    const load = async () => {
+      document.getElementById('kv-movies').innerHTML = spinner('Skládám dokonalý večer...');
+      try {
+        let source;
+        if (fromSaved) {
+          source = Storage.getFavorites();
+          if (source.length < 3) { document.getElementById('kv-movies').innerHTML = '<div class="empty-state"><div class="empty-state__icon">😅</div><div class="empty-state__title">Potřebuješ alespoň 3 uložené filmy</div></div>'; return; }
+        } else {
+          source = await API.getPopular();
+        }
+        const result = await API.getKinoVecer(source);
+        if (!result) { document.getElementById('kv-movies').innerHTML = '<div class="empty-state"><div class="empty-state__icon">😕</div><div class="empty-state__title">Nepodařilo se sestavit program</div></div>'; return; }
+        currentPicks = result.movies;
+
+        const badge = document.getElementById('kv-theme-badge');
+        if (badge) badge.innerHTML = `<div class="kv-theme">${escHtml(result.theme)}</div>`;
+        const anchor = document.getElementById('kv-anchor');
+        if (anchor) anchor.innerHTML = `<div class="kv-anchor">Inspirováno filmem: ${escHtml(result.anchor)}</div>`;
+
+        const times = ['~19:00','~21:15','~23:30'];
+        const slots = ['Film 1','Film 2','Film 3'];
+        document.getElementById('kv-movies').innerHTML = result.movies.map((m, i) => `
+          <div class="kv-movie-card" data-movie='${JSON.stringify(m).replace(/'/g,"&#39;")}'>
+            <div>
+              <div class="kv-num">${i+1}</div>
+              <div class="kv-time">${times[i]}</div>
+            </div>
+            ${m.posterUrl ? `<img class="kv-poster" src="${m.posterUrl}" alt="">` : ''}
+            <div class="kv-info">
+              <div class="kv-slot">${slots[i]}</div>
+              <div class="kv-title">${escHtml(m.title)}</div>
+              <div class="kv-sub">${m.year}${m.rating>0?` · ★ ${m.rating.toFixed(1)}`:''}</div>
+            </div>
+            <div style="color:var(--text3)">›</div>
+          </div>`).join('');
+
+        document.querySelectorAll('.kv-movie-card').forEach(card => {
+          card.addEventListener('click', () => {
+            let m; try { m = JSON.parse(card.dataset.movie); } catch { return; }
+            openMovieDetail(m);
+          });
+        });
+      } catch(e) {
+        document.getElementById('kv-movies').innerHTML = '<div class="empty-state"><div class="empty-state__icon">⚠️</div><div class="empty-state__title">Chyba při načítání</div></div>';
+      }
+    };
+
+    document.getElementById('kv-refresh').addEventListener('click', load);
+    document.getElementById('kv-save-all').addEventListener('click', () => {
+      currentPicks.forEach(m => Storage.saveFavorite(m));
+      document.dispatchEvent(new CustomEvent('favorites-changed'));
+      showToast(`🎬 ${currentPicks.length} filmy uloženy!`);
+    });
+
+    await load();
+  },
+};
+
+// Start
+App.init();
+</script>
+</body>
+</html>
