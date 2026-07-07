@@ -335,6 +335,7 @@ function attachCardEvents(container, opts = {}) {
         e.stopPropagation();
         hideMiniTrailer(card);
         const newWatched = Storage.toggleWatched(movie.imdbId);
+        if (newWatched && !Storage.isFavorite(movie.imdbId)) Storage.saveFavorite(movie);
         // Update all matching cards on screen
         document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => {
           const overlay = c.querySelector('.movie-card__watched-overlay');
@@ -657,6 +658,7 @@ async function openMovieDetail(movie) {
   const watchedBtn = overlay.querySelector('#_btn-watched');
   watchedBtn.addEventListener('click', () => {
     const now = Storage.toggleWatched(movie.imdbId);
+    if (now && !Storage.isFavorite(movie.imdbId)) Storage.saveFavorite(movie);
     watchedBtn.textContent = now ? '✓ Viděno' : '○ Neviděno';
     watchedBtn.className   = `btn ${now ? 'btn--success' : 'btn--ghost'}`;
     document.dispatchEvent(new CustomEvent('favorites-changed'));
@@ -984,6 +986,14 @@ async function initSeriesEpisodes(overlay, movie) {
     document.dispatchEvent(new CustomEvent('favorites-changed'));
   };
 
+  // Automaticky uloží seriál do oblíbených při prvním shlédnutém dílu
+  const autoFavIfNeeded = () => {
+    if (!Storage.isFavorite(movie.imdbId)) {
+      Storage.saveFavorite(movie);
+      document.dispatchEvent(new CustomEvent('favorites-changed'));
+    }
+  };
+
   const updateMarkBtn = () => {
     const nums = epNums[current] || [];
     const wc = nums.length ? Storage.getSeasonWatchedCount(tvId, current, nums) : 0;
@@ -1040,6 +1050,7 @@ async function initSeriesEpisodes(overlay, movie) {
     const nums = epNums[current] || [];
     const turnOn = !Storage.isSeasonWatched(tvId, current, nums);
     Storage.setSeasonWatched(tvId, current, nums, turnOn);
+    if (turnOn) autoFavIfNeeded();
     renderEpisodes(); updateMarkBtn();
     refreshTopProgress(); syncSeriesWatched();
   });
@@ -1050,6 +1061,7 @@ async function initSeriesEpisodes(overlay, movie) {
     if (!chk) return;
     const epNum = +chk.dataset.ep;
     const now = Storage.toggleEpisodeWatched(tvId, current, epNum);
+    if (now) autoFavIfNeeded();
     chk.classList.toggle('tv-ep-check--on', now);
     chk.textContent = now ? '✓' : '○';
     chk.closest('.tv-episode')?.classList.toggle('tv-episode--watched', now);
@@ -1080,6 +1092,7 @@ async function initSeriesEpisodes(overlay, movie) {
         Storage.setSeasonWatched(tvId, s.seasonNumber, epNums[s.seasonNumber], turnOn);
       }
       Storage.setWatched(tvId, turnOn);
+      if (turnOn) autoFavIfNeeded();
       watchedBtn.disabled = false;
       renderEpisodes(); updateMarkBtn();
       refreshTopProgress(); syncSeriesWatched();
@@ -1104,7 +1117,7 @@ function showSyncModal() {
       <div id="_sync-export">
         <p style="color:var(--text2);font-size:13px;margin-bottom:14px;line-height:1.5">
           Vygeneruj kód na <strong>tomto zařízení</strong> a vlož ho na druhém.
-          Kód obsahuje oblíbené, hodnocení, komentáře a kolekce (ne API token).
+          Kód obsahuje šuplík, hodnocení, komentáře a kolekce (ne API token).
         </p>
         <button class="btn btn--primary" id="_gen-code" style="width:100%;justify-content:center">🔄 Vygenerovat kód</button>
         <div id="_export-result" style="display:none;margin-top:14px">

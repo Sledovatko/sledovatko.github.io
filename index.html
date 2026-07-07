@@ -899,7 +899,7 @@ select option{background:var(--surface)!important;color:var(--text)!important}
     </button>
     <button class="nav-btn" data-screen="favorites">
       <div class="nav-btn__icon">❤️</div>
-      <div>Oblíbené</div>
+      <div>🗄️ Šuplík</div>
       <div class="nav-btn__badge hidden" id="fav-badge"></div>
     </button>
 
@@ -1313,8 +1313,9 @@ const App = {
           <div class="filter-row">
             <div class="filter-label">Typ:</div>
             <div class="filter-chips">
-              <div class="filter-chip ${!st.filters.searchTV ? 'active' : ''}" data-type="movie">🎬 Film</div>
-              <div class="filter-chip ${st.filters.searchTV ? 'active' : ''}" data-type="tv">📺 Seriál</div>
+              <div class="filter-chip ${(!st.filters.typeFilter || st.filters.typeFilter === 'all') ? 'active' : ''}" data-type="all">📽️ Vše</div>
+              <div class="filter-chip ${st.filters.typeFilter === 'movie' ? 'active' : ''}" data-type="movie">🎬 Film</div>
+              <div class="filter-chip ${st.filters.typeFilter === 'tv' ? 'active' : ''}" data-type="tv">📺 Seriál</div>
             </div>
             <select class="sort-select" id="sort-select" style="margin-left:auto">
               <option value="relevance" ${st.sortBy==='relevance'?'selected':''}>Relevance</option>
@@ -1452,7 +1453,13 @@ const App = {
     document.querySelectorAll('[data-type]').forEach(el => el.addEventListener('click', () => {
       document.querySelectorAll('[data-type]').forEach(e => e.classList.remove('active'));
       el.classList.add('active');
-      setFilter('searchTV', el.dataset.type === 'tv');
+      const type = el.dataset.type;
+      if (type === 'all') {
+        delete st.filters.typeFilter;
+      } else {
+        st.filters.typeFilter = type;
+      }
+      this._doSearch(this._searchState.query || '');
     }));
 
     document.getElementById('sort-select')?.addEventListener('change', e => { this._searchState.sortBy = e.target.value; if (this._searchState.query || Object.values(this._searchState.filters).some(Boolean)) this._doSearch(this._searchState.query || ''); });
@@ -1543,19 +1550,24 @@ const App = {
 
       const PAGES = st.maxPages || 10;
       const pageNums = Array.from({ length: PAGES }, (_, i) => i + 1);
-      const results = await Promise.allSettled(pageNums.map(p =>
-        API.searchMovies(query, {
-          yearFrom: st.filters.yearFrom, yearTo: st.filters.yearTo,
-          genreId: st.filters.genreId, minRating: st.filters.minRating,
-          searchTV: st.filters.searchTV, page: p,
-        })
-      ));
+      const typesToSearch = !st.filters.typeFilter || st.filters.typeFilter === 'all'
+        ? [false, true]
+        : [st.filters.typeFilter === 'tv'];
       const seen = new Set();
       let movies = [];
-      for (const r of results) {
-        if (r.status !== 'fulfilled') continue;
-        for (const m of r.value) {
-          if (!seen.has(m.imdbId)) { seen.add(m.imdbId); movies.push(m); }
+      for (const searchTV of typesToSearch) {
+        const results = await Promise.allSettled(pageNums.map(p =>
+          API.searchMovies(query, {
+            yearFrom: st.filters.yearFrom, yearTo: st.filters.yearTo,
+            genreId: st.filters.genreId, minRating: st.filters.minRating,
+            searchTV, page: p,
+          })
+        ));
+        for (const r of results) {
+          if (r.status !== 'fulfilled') continue;
+          for (const m of r.value) {
+            if (!seen.has(m.imdbId)) { seen.add(m.imdbId); movies.push(m); }
+          }
         }
       }
       movies = this._sortMovies(movies, st.sortBy);
@@ -1660,7 +1672,7 @@ const App = {
     s.innerHTML = `
       <div class="favs-header">
         <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px">
-          <h2 style="flex:1;font-size:16px;font-weight:800">❤️ Moje oblíbené</h2>
+          <h2 style="flex:1;font-size:16px;font-weight:800">🗄️ Můj Šuplík</h2>
           <button class="btn btn--icon" id="btn-random-unseen" title="Náhodný neshlédnutý">🎲</button>
           <button class="btn btn--icon" id="btn-calendar" title="Kalendář">${st.calendarView?'🔲':'📅'}</button>
           <button class="btn btn--icon" id="btn-stats" title="Statistiky">📊</button>
@@ -1742,7 +1754,7 @@ const App = {
   _emptyFavs() {
     return `<div class="empty-state">
       <div class="empty-state__icon">🎬</div>
-      <div class="empty-state__title">Ještě žádné oblíbené</div>
+      <div class="empty-state__title">Šuplík je prázdný</div>
       <div class="empty-state__sub">Klikni na 🔖 u libovolného filmu nebo prozkoumej sekci Bored 😴</div>
     </div>`;
   },

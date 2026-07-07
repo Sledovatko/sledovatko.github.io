@@ -36,7 +36,7 @@ const Storage = (() => {
     getTheme() { return get(K.THEME, 'dark'); },
     setTheme(t) { set(K.THEME, t); },
 
-    // ── Oblíbené ──────────────────────────────────────────────────────────────
+    // ── Šuplík ──────────────────────────────────────────────────────────────
     getFavorites() {
       const favs = get(K.FAVORITES, []);
       const order = get(K.ORDER, []);
