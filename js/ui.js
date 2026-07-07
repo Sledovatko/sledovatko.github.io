@@ -62,7 +62,6 @@ function spinner(text = 'Načítám...') {
 // ── Movie card ────────────────────────────────────────────────────────────────
 function movieCard(movie, opts = {}) {
   const isFav     = Storage.isFavorite(movie.imdbId);
-  const isWatched = Storage.isWatched(movie.imdbId);
   const rating    = Storage.getRating(movie.imdbId);
   const label     = Storage.getLabels()[movie.imdbId];
   const allDefs   = getAllLabelDefs();
@@ -88,7 +87,6 @@ function movieCard(movie, opts = {}) {
       ${movie.posterUrl
         ? `<img class="movie-card__poster" src="${movie.posterUrl}" alt="${escHtml(movie.title)}" loading="lazy">`
         : `<div class="movie-card__placeholder"><span>🎬</span></div>`}
-      ${isWatched ? '<div class="movie-card__watched-overlay"></div>' : ''}
       ${labelDef ? `<div class="movie-card__label-strip" style="background:${labelDef.color}"></div>` : ''}
       <div class="movie-card__hover-overlay">
         <button class="btn btn--quick-add ${isFav ? 'active' : ''}" data-action="quick-add"
@@ -96,7 +94,6 @@ function movieCard(movie, opts = {}) {
           ${isFav ? '✓ Uloženo' : '+ Přidat'}
         </button>
       </div>
-      ${isWatched ? '<div class="movie-card__watched-badge">✓</div>' : ''}
       ${dateStr ? `<div class="movie-card__date-badge">${dateStr}</div>` : ''}
       ${ctxHtml}
     </div>
@@ -273,7 +270,7 @@ function attachCardEvents(container, opts = {}) {
     });
 
     // Buttons inside poster: pause on enter, RESTART timer on leave (cursor back on poster image)
-    poster.querySelectorAll('button, [data-action], .btn--quick-add, .fav-ctx-btn, .movie-card__watched-badge').forEach(btn => {
+    poster.querySelectorAll('button, [data-action], .btn--quick-add, .fav-ctx-btn').forEach(btn => {
       btn.addEventListener('mouseenter', () => {
         card._hoverActive = false;
         clearTimeout(card._miniTimer);
@@ -335,38 +332,6 @@ function attachCardEvents(container, opts = {}) {
         const newState = !isFav;
         document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => updateCardFavState(c, newState));
         showToast(newState ? `🔖 ${movie.title} přidán` : `❌ ${movie.title} odebrán`);
-        document.dispatchEvent(new CustomEvent('favorites-changed'));
-      } else if (action === 'toggle-watched') {
-        e.stopPropagation();
-        hideMiniTrailer(card);
-        const newWatched = Storage.toggleWatched(movie.imdbId);
-        if (newWatched && !Storage.isFavorite(movie.imdbId)) Storage.saveFavorite(movie);
-        // Update all matching cards on screen
-        document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => {
-          const overlay = c.querySelector('.movie-card__watched-overlay');
-          const badge = c.querySelector('.movie-card__watched-toggle');
-          if (overlay) overlay.style.display = newWatched ? '' : 'none';
-          else if (newWatched) {
-            const pw = c.querySelector('.movie-card__poster-wrap');
-            if (pw) { const ov = document.createElement('div'); ov.className = 'movie-card__watched-overlay'; pw.insertBefore(ov, pw.firstChild.nextSibling); }
-          }
-          if (badge) {
-            if (newWatched) {
-              badge.textContent = '✓';
-              badge.title = 'Označit jako neshlédnuté';
-              badge.style.background = '';
-              badge.style.color = '';
-              badge.classList.remove('movie-card__watched-toggle--unseen');
-            } else {
-              badge.textContent = '👁';
-              badge.title = 'Označit jako shlédnuté';
-              badge.style.background = 'rgba(0,0,0,0.55)';
-              badge.style.color = 'rgba(255,255,255,0.7)';
-              badge.classList.add('movie-card__watched-toggle--unseen');
-            }
-          }
-        });
-        showToast(newWatched ? `👁 ${movie.title} — shlédnuto` : `○ ${movie.title} — neshlédnuto`);
         document.dispatchEvent(new CustomEvent('favorites-changed'));
       } else if (action === 'ctx-menu') {
         e.stopPropagation();
