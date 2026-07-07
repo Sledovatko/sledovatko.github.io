@@ -96,11 +96,7 @@ function movieCard(movie, opts = {}) {
           ${isFav ? '✓ Uloženo' : '+ Přidat'}
         </button>
       </div>
-      ${opts.watchedToggle
-        ? (isWatched
-            ? `<div class="movie-card__watched-badge movie-card__watched-toggle" data-action="toggle-watched" title="Označit jako neshlédnuté" style="cursor:pointer">✓</div>`
-            : `<div class="movie-card__watched-badge movie-card__watched-toggle movie-card__watched-toggle--unseen" data-action="toggle-watched" title="Označit jako shlédnuté" style="cursor:pointer;background:rgba(0,0,0,0.55);color:rgba(255,255,255,0.7)">👁</div>`)
-        : (isWatched ? '<div class="movie-card__watched-badge">✓</div>' : '')}
+      ${isWatched ? '<div class="movie-card__watched-badge">✓</div>' : ''}
       ${dateStr ? `<div class="movie-card__date-badge">${dateStr}</div>` : ''}
       ${ctxHtml}
     </div>
@@ -192,7 +188,16 @@ function attachCategoryEvents(containerId, opts = {}) {
     const canL = () => row.scrollLeft > 2;
     const canR = () => row.scrollLeft < row.scrollWidth - row.clientWidth - 2;
 
-    row.addEventListener('scroll', updateDots, { passive: true });
+    row.addEventListener('scroll', () => {
+      updateDots();
+      // Skryj šipku, pokud jsme na konci — aktualizuje se i při kliku na šipku
+      if (leftBtn.style.opacity === '1' && !canL()) {
+        leftBtn.style.opacity = '0'; leftBtn.style.pointerEvents = 'none';
+      }
+      if (rightBtn.style.opacity === '1' && !canR()) {
+        rightBtn.style.opacity = '0'; rightBtn.style.pointerEvents = 'none';
+      }
+    }, { passive: true });
     leftBtn.addEventListener('click',  () => row.scrollBy({ left: -Math.round(row.clientWidth * 0.8), behavior: 'smooth' }));
     rightBtn.addEventListener('click', () => row.scrollBy({ left:  Math.round(row.clientWidth * 0.8), behavior: 'smooth' }));
 
@@ -487,14 +492,14 @@ async function showMiniTrailer(card, movie) {
         <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.55) 100%)"></div>
         <!-- Top gradient -->
         <div style="position:absolute;top:0;left:0;right:0;height:60px;background:linear-gradient(rgba(0,0,0,.5),transparent)"></div>
-        <!-- Bottom gradient with info -->
-        <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.92) 60%)" id="_mf-info">
+        <!-- Bottom gradient with info posunutý výš -->
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:70px 14px 16px;background:linear-gradient(transparent 20%,rgba(0,0,0,.92) 70%)" id="_mf-info">
           <div style="font-size:13px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px;text-shadow:0 1px 6px rgba(0,0,0,.8);opacity:0;transform:translateY(6px);transition:all .5s .1s" id="_mf-title">${escHtml(movie.title)}</div>
           <div style="display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(4px);transition:all .5s .25s" id="_mf-meta">
             ${movie.rating > 0 ? `<span style="color:#FFB300;font-size:11px;font-weight:700">★ ${movie.rating.toFixed(1)}</span>` : ''}
             ${movie.year ? `<span style="color:rgba(255,255,255,.5);font-size:11px">${movie.year}</span>` : ''}
-            ${movie.overview ? `<span style="color:rgba(255,255,255,.35);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(movie.overview.substring(0,60))}…</span>` : ''}
           </div>
+          ${movie.overview ? `<div style="color:rgba(255,255,255,.7);font-size:10px;line-height:1.55;margin-top:4px;text-shadow:0 1px 4px rgba(0,0,0,.7);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;opacity:0;transform:translateY(4px);transition:all .5s .35s" id="_mf-overview">${escHtml(movie.overview)}</div>` : ''}
         </div>
         <!-- Progress bar -->
         ${hasMultiple ? `<div style="position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(255,255,255,.12)">
@@ -505,9 +510,11 @@ async function showMiniTrailer(card, movie) {
     // Animate info in after short delay
     const titleEl = box.querySelector('#_mf-title');
     const metaEl  = box.querySelector('#_mf-meta');
+    const overviewEl = box.querySelector('#_mf-overview');
     setTimeout(() => {
       if (titleEl) { titleEl.style.opacity = '1'; titleEl.style.transform = 'translateY(0)'; }
       if (metaEl)  { metaEl.style.opacity  = '1'; metaEl.style.transform  = 'translateY(0)'; }
+      if (overviewEl) { overviewEl.style.opacity = '1'; overviewEl.style.transform = 'translateY(0)'; }
     }, 200);
 
     // Crossfade slideshow
@@ -635,8 +642,7 @@ async function openMovieDetail(movie) {
       </div>
       <div class="detail-section" style="padding-bottom:20px">
         <h3>📝 Poznámka</h3>
-        <textarea class="input detail-comment" id="_comment" placeholder="Napiš si poznámku...">${escHtml(myComment)}</textarea>
-        <button class="btn btn--primary" id="_save-comment" style="margin-top:8px">Uložit poznámku</button>
+        <textarea class="input detail-comment" id="_comment" placeholder="Napiš si poznámku..." style="resize:vertical">${escHtml(myComment)}</textarea>
       </div>
     </div>
   `, { wide: true, tall: true });
@@ -678,7 +684,7 @@ async function openMovieDetail(movie) {
         if (isYT) {
           // YouTube: thumbnail overlay + popup (embeds blocked by Error 153 on most trailers)
           const tOverlay = document.createElement('div');
-          tOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;cursor:pointer';
+          tOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px';
           const iW = Math.min(640, window.innerWidth - 48);
           const iH = Math.round(iW * 9/16);
           const thumb = `https://img.youtube.com/vi/${videoKey}/maxresdefault.jpg`;
@@ -697,10 +703,7 @@ async function openMovieDetail(movie) {
             <button style="color:rgba(255,255,255,.6);font-size:13px;padding:8px 20px;border-radius:8px;background:rgba(255,255,255,.08);border:none;cursor:pointer">✕ Zavřít</button>`;
           tOverlay.querySelector('#_yt-detail-box').addEventListener('click', e => {
             e.stopPropagation();
-            const pw = Math.min(960, screen.width - 40), ph = Math.round(pw * 9/16) + 30;
-            const pl = Math.round((screen.width - pw) / 2), pt = Math.round((screen.height - ph) / 2);
-            window.open(`https://www.youtube.com/watch?v=${videoKey}`,
-              'yt_trailer', `width=${pw},height=${ph},left=${pl},top=${pt},resizable=yes`);
+            window.open(`https://www.youtube.com/watch?v=${videoKey}`, '_blank');
           });
           tOverlay.querySelector('button').onclick = () => tOverlay.remove();
           tOverlay.addEventListener('click', e => { if (e.target === tOverlay) tOverlay.remove(); });
@@ -862,10 +865,17 @@ async function openMovieDetail(movie) {
     });
   });
 
-  overlay.querySelector('#_save-comment').addEventListener('click', () => {
-    Storage.setComment(movie.imdbId, overlay.querySelector('#_comment').value);
-    showToast('💾 Poznámka uložena');
-  });
+  // Auto-uložení poznámky při psaní (s debounce 600ms)
+  const commentEl = overlay.querySelector('#_comment');
+  let _commentTimer;
+  if (commentEl) {
+    commentEl.addEventListener('input', () => {
+      clearTimeout(_commentTimer);
+      _commentTimer = setTimeout(() => {
+        Storage.setComment(movie.imdbId, commentEl.value);
+      }, 300);
+    });
+  }
 
   // Seriály: načti sezóny a epizody do vyhrazené sekce
   if (movie.mediaType === 'tv') {
@@ -1108,7 +1118,7 @@ async function initSeriesEpisodes(overlay, movie) {
 // ── Sync Modal ──────────────────────────────────────────────────────────────
 function showSyncModal() {
   const overlay = showModal(`
-    <div style="padding:4px 0">
+    <div style="padding:12px 20px 4px">
       <div style="display:flex;gap:8px;margin-bottom:18px" id="_sync-tabs">
         <button class="btn btn--primary btn--sm" id="_tab-export" style="flex:1">📤 Exportovat</button>
         <button class="btn btn--ghost btn--sm" id="_tab-import" style="flex:1">📥 Importovat</button>
@@ -1119,7 +1129,7 @@ function showSyncModal() {
           Vygeneruj kód na <strong>tomto zařízení</strong> a vlož ho na druhém.
           Kód obsahuje šuplík, hodnocení, komentáře a kolekce (ne API token).
         </p>
-        <button class="btn btn--primary" id="_gen-code" style="width:100%;justify-content:center">🔄 Vygenerovat kód</button>
+        <button class="btn btn--primary" id="_gen-code" style="width:100%;justify-content:center;margin-bottom:14px">🔄 Vygenerovat kód</button>
         <div id="_export-result" style="display:none;margin-top:14px">
           <textarea id="_export-code" readonly style="width:100%;height:90px;font-size:11px;font-family:monospace;word-break:break-all;resize:none;border-radius:8px;padding:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text)"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px">
@@ -1141,6 +1151,12 @@ function showSyncModal() {
       </div>
     </div>
   `, { title: '🔄 Synchronizace zařízení' });
+
+  // Užší hlavička modálu
+  const syncHeader = overlay.querySelector('.modal-header');
+  if (syncHeader) syncHeader.style.padding = '10px 20px';
+  const syncH3 = overlay.querySelector('.modal-header h3');
+  if (syncH3) syncH3.style.fontSize = '14px';
 
   // Tab switching
   const tabExport = overlay.querySelector('#_tab-export');

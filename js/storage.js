@@ -8,7 +8,6 @@ const Storage = (() => {
     WATCHED: 'wm_watched',
     RATINGS: 'wm_ratings',
     COMMENTS: 'wm_comments',
-    COLLECTIONS: 'wm_collections',
     LABELS: 'wm_labels',
     ORDER: 'wm_order',
     THEME: 'wm_theme',
@@ -145,28 +144,6 @@ const Storage = (() => {
       set(K.COMMENTS, c);
     },
 
-    // ── Kolekce ───────────────────────────────────────────────────────────────
-    getCollections() { return get(K.COLLECTIONS, []); },
-    saveCollections(cols) { set(K.COLLECTIONS, cols); },
-    createCollection(name) {
-      const cols = get(K.COLLECTIONS, []);
-      cols.push({ id: Date.now().toString(), name, movieIds: [] });
-      set(K.COLLECTIONS, cols);
-    },
-    addToCollection(colId, imdbId) {
-      const cols = get(K.COLLECTIONS, []);
-      const col = cols.find(c => c.id === colId);
-      if (col && !col.movieIds.includes(imdbId)) { col.movieIds.push(imdbId); set(K.COLLECTIONS, cols); }
-    },
-    removeFromCollection(colId, imdbId) {
-      const cols = get(K.COLLECTIONS, []);
-      const col = cols.find(c => c.id === colId);
-      if (col) { col.movieIds = col.movieIds.filter(id => id !== imdbId); set(K.COLLECTIONS, cols); }
-    },
-    deleteCollection(colId) {
-      set(K.COLLECTIONS, get(K.COLLECTIONS, []).filter(c => c.id !== colId));
-    },
-
     // ── Štítky ────────────────────────────────────────────────────────────────
     getLabels() { return get(K.LABELS, {}); },
     setLabel(imdbId, color) {
@@ -235,7 +212,7 @@ const Storage = (() => {
     exportAllData() {
       // Export all keys except API token
       const exportKeys = [K.FAVORITES, K.WATCHED, K.RATINGS, K.COMMENTS,
-                          K.COLLECTIONS, K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES];
+                          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES];
       const data = { _v: 1, _t: Date.now() };
       for (const k of exportKeys) {
         const v = localStorage.getItem(k);
@@ -254,7 +231,7 @@ const Storage = (() => {
         if (!data || data._v !== 1) return false;
         const safeKeys = new Set([
           K.FAVORITES, K.WATCHED, K.RATINGS, K.COMMENTS,
-          K.COLLECTIONS, K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES, 'wm_custom_labels',
+          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES, 'wm_custom_labels',
         ]);
         for (const [k, v] of Object.entries(data)) {
           if (!safeKeys.has(k)) continue; // skip _v, _t, token etc.

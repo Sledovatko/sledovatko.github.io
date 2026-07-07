@@ -120,8 +120,8 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 /* ═══════════════════════════════════════════════════
    CATEGORY ROW
 ═══════════════════════════════════════════════════ */
-.category{margin-bottom:4px}
-.category__header{display:flex;align-items:center;gap:8px;padding:20px 20px 10px}
+.category{margin-bottom:2px}
+.category__header{display:flex;align-items:center;gap:8px;padding:10px 20px 6px}
 .category__accent{width:3px;height:18px;border-radius:2px;flex-shrink:0}
 .category__title{font-size:16px;font-weight:700;flex:1}
 .category__collapse{background:none;border:none;color:var(--text3);font-size:14px;padding:4px}
@@ -131,16 +131,16 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 /* TASK 1 FIX: vertical padding gives the scaled card (translateY(-9px) scale(1.05))
    and its glow shadow room to breathe — never clipped by overflow-y:hidden and never
    tucked under the header. Cards visibly sit lower, away from the title. */
-.category__row{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:20px 20px 26px;scrollbar-width:none}
+.category__row{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:22px 20px 22px;scrollbar-width:none}
 .category__row::-webkit-scrollbar{display:none}
 /* Arrow centered on the row via 50% (robust to the new padding) instead of a hardcoded top. */
-.category__arrow{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.7);border:1.5px solid rgba(255,255,255,.25);color:#fff;display:flex;align-items:center;justify-content:center;z-index:5;opacity:0;transition:opacity .2s,background .18s var(--ease-spring),transform .18s var(--ease-spring),box-shadow .2s,color .15s,border-color .15s;cursor:pointer}
+.category__arrow{position:absolute;top:calc(50% - 27px);transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.7);border:1.5px solid rgba(255,255,255,.25);color:#fff;display:flex;align-items:center;justify-content:center;z-index:5;opacity:0;transition:opacity .2s,background .18s var(--ease-spring),transform .18s var(--ease-spring),box-shadow .2s,color .15s,border-color .15s;cursor:pointer}
 .category__arrow--left{left:8px}
 .category__arrow--right{right:8px}
 .category__arrow:hover{background:rgba(0,201,167,.35);border-color:var(--accent);color:var(--accent);transform:translateY(-50%) scale(1.12);box-shadow:0 6px 20px rgba(0,201,167,.4)}
 .category__arrow:active{transform:translateY(-50%) scale(.94)}
 .category__arrow:focus-visible{outline:none;border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 3px var(--focus-ring)}
-.category__dots{display:flex;justify-content:center;gap:4px;padding:4px 0 8px}
+.category__dots{display:flex;justify-content:center;gap:4px;padding:0 0 4px}
 .dot{height:4px;border-radius:2px;background:var(--border);transition:all .2s;width:6px}
 .dot.active{width:16px;background:var(--accent)}
 
@@ -197,18 +197,23 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 .home-header{display:flex;align-items:center;gap:10px;padding:18px 20px 0}
 .home-logo{font-size:24px;font-weight:800;flex:1}
 .home-logo span{color:var(--accent)}
-.home-greeting{font-size:12px;color:var(--text3);padding:4px 20px 0}
 .home-stats-chip{background:rgba(0,201,167,.12);color:var(--accent);border-radius:10px;padding:4px 10px;font-size:11px;font-weight:600}
 .icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);font-size:18px;transition:background .15s}
 .icon-btn:hover{background:rgba(0,201,167,.15)}
 
 /* Mood picker */
-.mood-section{padding:14px 20px 0}
-.mood-label{font-size:12px;color:var(--text3);margin-bottom:8px}
-.mood-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.mood-section{padding:8px 20px 0;position:relative}
+.mood-label{font-size:12px;color:var(--text3);margin-bottom:14px}
+.mood-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 12px 24px}
 .mood-chips::-webkit-scrollbar{display:none}
-.mood-chip{flex-shrink:0;padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;cursor:pointer;border:1px solid transparent}
+.mood-chip{flex-shrink:0;padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;cursor:pointer;border:1px solid transparent;position:relative;z-index:2}
 .mood-chip:hover,.mood-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+/* Glow za aktivním chipem — přetéká mimo overflow kontejner */
+.mood-glow{position:absolute;border-radius:22px;pointer-events:none;
+  background:radial-gradient(ellipse,var(--accent-glow),transparent 70%);
+  opacity:0;transition:opacity .25s ease,left .2s ease,top .2s ease,width .2s ease;
+  z-index:1;filter:blur(6px);will-change:transform,opacity}
+.mood-glow.visible{opacity:1}
 
 /* Daily movie */
 .daily-card{margin:16px 20px 0;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;min-height:110px;background:var(--surface2);transition:filter .2s}
@@ -292,7 +297,7 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
    FAVORITES SCREEN
 ═══════════════════════════════════════════════════ */
 .favs-header{padding:16px 16px 0;position:sticky;top:0;background:var(--bg);z-index:10}
-.favs-toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;flex-wrap:wrap}
+.favs-toolbar{display:flex;align-items:center;gap:6px;padding:4px 16px;flex-wrap:wrap;background:var(--bg)}
 .progress-bar-wrap{padding:0 16px 8px}
 .progress-bar-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:var(--text2)}
 .progress-bar{height:6px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden}
@@ -305,13 +310,6 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 .stat-item__val{font-size:20px;font-weight:800;color:var(--accent)}
 .stat-item__label{font-size:10px;color:var(--text3)}
 
-/* Collections */
-.collections-row{padding:0 16px 8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
-.collections-row::-webkit-scrollbar{display:none}
-.col-chip{flex-shrink:0;padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.06);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text2);display:flex;align-items:center;gap:5px}
-.col-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
-.col-chip__del{font-size:11px;opacity:.6;display:none}
-.col-chip:hover .col-chip__del{display:inline}
 
 /* Labels filter */
 .labels-row{padding:0 16px 6px;display:flex;gap:6px;flex-wrap:wrap}
@@ -335,8 +333,12 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 /* Calendar view */
 .calendar-view{padding:16px}
 .cal-year{font-size:28px;font-weight:900;color:var(--accent);margin:12px 0 8px}
-.cal-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px}
+.cal-row{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px}
 .cal-row::-webkit-scrollbar{display:none}
+/* V kalendáři žádné zvedání karet */
+.calendar-view .movie-card:hover{transform:none}
+.calendar-view .movie-card:hover .movie-card__poster-wrap{box-shadow:none}
+.calendar-view .movie-card:hover .movie-card__poster-wrap::after{transform:translateX(-135%)}
 
 /* ═══════════════════════════════════════════════════
    BORED SCREEN
@@ -374,12 +376,12 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 .hon-verdict.visible{opacity:1}
 .hon-btns{display:flex;align-items:center;justify-content:center;gap:20px;padding:16px 16px 20px;flex-shrink:0}
 .hon-btn{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
-.hon-btn__circle{border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:24px}
+.hon-btn__circle{border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:min(5vw,28px)}
 .hon-btn__circle:hover{transform:scale(1.12)}
-.hon-btn--skip .hon-btn__circle{width:54px;height:54px;background:rgba(255,50,50,.15);color:#E53935}
-.hon-btn--detail .hon-btn__circle{width:40px;height:40px;background:rgba(255,255,255,.08);color:var(--text2);font-size:18px}
-.hon-btn--save .hon-btn__circle{width:54px;height:54px;background:var(--accent);color:#000}
-.hon-btn__label{font-size:11px;color:var(--text3);font-weight:600}
+.hon-btn--skip .hon-btn__circle{width:min(12vw,66px);height:min(12vw,66px);background:rgba(255,50,50,.15);color:#E53935}
+.hon-btn--detail .hon-btn__circle{width:min(9vw,50px);height:min(9vw,50px);background:rgba(255,255,255,.08);color:var(--text2);font-size:min(4vw,22px)}
+.hon-btn--save .hon-btn__circle{width:min(12vw,66px);height:min(12vw,66px);background:var(--accent);color:#000}
+.hon-btn__label{font-size:min(2.5vw,13px);color:var(--text3);font-weight:600}
 .hon-done{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:24px}
 .hon-done__emoji{font-size:64px}
 .hon-done__title{font-size:24px;font-weight:900}
@@ -446,17 +448,16 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
 }
 
 /* ── Action buttons row (Bored + Hot or Not side by side) ── */
-.action-btns-row{display:flex;gap:10px;margin:12px 20px 0}
+.action-btns-row{display:flex;gap:10px;margin:0 20px 0}
 .action-btns-row .bored-btn{flex:1;margin:0}
 .hotnot-btn{border-color:rgba(255,100,50,.3)!important}
 .hotnot-btn:hover{border-color:#FF6D00!important;background:rgba(255,109,0,.08)!important}
 
-/* FIX #6: favorites ctx button — rides on top-right of card, matches card hover */
-.fav-ctx-btn{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:7px;
-  background:rgba(0,0,0,.72);color:rgba(255,255,255,.85);font-size:16px;
-  display:none;align-items:center;justify-content:center;z-index:3;
+/* FIX #6: favorites ctx button — trvale viditelný, větší */
+.fav-ctx-btn{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:8px;
+  background:rgba(0,0,0,.65);color:rgba(255,255,255,.9);font-size:18px;
+  display:flex;align-items:center;justify-content:center;z-index:3;
   border:none;cursor:pointer;transition:background .15s;line-height:1}
-.movie-card:hover .fav-ctx-btn{display:flex}
 .fav-ctx-btn:hover{background:var(--accent);color:#000}
 
 /* FIX #7: label strip at bottom of poster */
@@ -741,7 +742,7 @@ body::before{
    accessible focus glow. Color reacts (accent shift / glow) on interaction. */
 .nav-btn,.icon-btn,.mood-chip,.rating-btn,.category__arrow,.modal-close,
 .tv-ep-check,.tv-season__markall,.btn,.kv-source-btn,.bored-filter,
-.filter-chip,.chip,.col-chip,.suggestion,.category__see-all{
+.filter-chip,.chip,.suggestion,.category__see-all{
   transition:transform .2s var(--ease-spring),box-shadow .22s ease,
     background .22s ease,color .2s ease,border-color .2s ease,filter .2s ease;
 }
@@ -749,7 +750,7 @@ body::before{
 .btn:focus-visible,.icon-btn:focus-visible,.mood-chip:focus-visible,
 .rating-btn:focus-visible,.modal-close:focus-visible,.tv-ep-check:focus-visible,
 .tv-season__markall:focus-visible,.kv-source-btn:focus-visible,
-.bored-filter:focus-visible,.filter-chip:focus-visible,.col-chip:focus-visible,
+.bored-filter:focus-visible,.filter-chip:focus-visible,
 .chip:focus-visible,.suggestion:focus-visible,.category__see-all:focus-visible{
   outline:none;box-shadow:0 0 0 3px var(--focus-ring);
 }
@@ -769,8 +770,7 @@ body::before{
 .icon-btn:active{transform:translateY(0) scale(.9) rotate(-5deg)}
 
 /* ── mood-chip: living gradient when active ── */
-.mood-chip.active{background:var(--grad-accent);color:#1a1206;border-color:transparent;
-  box-shadow:0 6px 18px var(--accent-glow)}
+.mood-chip.active{background:var(--grad-accent);color:#1a1206;border-color:transparent}
 .mood-chip:active{transform:scale(.95)}
 
 /* ── rating-btn: glow on hover/active, press feedback ── */
@@ -800,10 +800,10 @@ body::before{
 .category__see-all:active{transform:scale(.95)}
 
 /* ── filter / bored / collection chips: accent-driven active state ── */
-.filter-chip.active,.bored-filter.active,.col-chip.active{
+.filter-chip.active,.bored-filter.active{
   background:var(--grad-accent);color:#1a1206;border-color:transparent;
-  box-shadow:0 5px 14px var(--accent-glow)}
-.filter-chip:active,.bored-filter:active,.col-chip:active,.chip:active,
+  box-shadow:0 3px 8px var(--accent-glow)}
+.filter-chip:active,.bored-filter:active,.chip:active,
 .suggestion:active{transform:scale(.95)}
 .chip:hover,.suggestion:hover{box-shadow:0 5px 14px var(--accent-glow)}
 
@@ -833,7 +833,7 @@ mark{background:rgba(255,194,51,.26);color:var(--accent)}
 .category__see-all:hover{background:rgba(255,194,51,.1)}
 
 /* ── Liquid-glass panels across the rest of the app ── */
-.search-header,.favs-header{background:transparent!important;
+.search-header{background:var(--glass-bg-strong)!important;
   -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4)}
 .filter-panel,.stats-panel,.kv-intro,.tip-card,.bored-topbar,.hon-card,.daily-card{
   background:var(--glass-bg-strong)!important;
@@ -898,8 +898,8 @@ select option{background:var(--surface)!important;color:var(--text)!important}
       <div>Hledat</div>
     </button>
     <button class="nav-btn" data-screen="favorites">
-      <div class="nav-btn__icon">❤️</div>
-      <div>🗄️ Šuplík</div>
+      <div class="nav-btn__icon">🗄️</div>
+      <div>Šuplík</div>
       <div class="nav-btn__badge hidden" id="fav-badge"></div>
     </button>
 
@@ -978,11 +978,6 @@ const App = {
   applyTheme(theme) {
     document.body.dataset.theme = theme;
     Storage.setTheme(theme);
-  },
-
-  toggleTheme() {
-    const current = Storage.getTheme();
-    this.applyTheme(current === 'dark' ? 'light' : 'dark');
   },
 
   navigate(screen) {
@@ -1079,20 +1074,15 @@ const App = {
   // ════════════════════════════════════════════════
   async renderHome() {
     const s = document.getElementById('screen');
-    const theme = Storage.getTheme();
-    const hour = new Date().getHours();
-    const greeting = hour < 6 ? 'Noční sova 🦉' : hour < 12 ? 'Dobré ráno ☀️' : hour < 18 ? 'Dobré odpoledne 🎬' : 'Dobrý večer 🌙';
     const stats = Storage.getStats();
     const collapsed = Storage.getCollapsed();
 
     s.innerHTML = `
-      <div class="home-greeting">${greeting}</div>
       <div class="home-header">
         <div class="home-logo">Sledov<span>á</span>tko</div>
         ${stats.total > 0 ? `<span class="home-stats-chip">${stats.watched}/${stats.total} viděno</span>` : ''}
         <button class="icon-btn" id="btn-random" title="Náhodný film">🎲</button>
-        <button class="icon-btn" id="btn-sync" title="Synchronizace zařízení">🔄</button>
-        <button class="icon-btn" id="btn-theme" title="Přepnout téma">${theme === 'dark' ? '☀️' : '🌙'}</button>
+        <button class="icon-btn" id="btn-sync" title="Synchronizace zařízení">🔗</button>
       </div>
       <div class="mood-section">
         <div class="mood-label">Na co máš náladu?</div>
@@ -1102,6 +1092,7 @@ const App = {
             `<div class="mood-chip" data-genre="${g.id}">${GENRE_EMOJIS[g.id] || '🎬'} ${g.name}</div>`
           ).join('')}
         </div>
+        <div class="mood-glow" id="mood-glow"></div>
       </div>
       <div class="action-btns-row">
         <div class="bored-btn" id="btn-bored">
@@ -1155,10 +1146,6 @@ const App = {
         }
       } catch { showToast('Chyba při načítání náhodného filmu'); }
     });
-    document.getElementById('btn-theme').addEventListener('click', () => {
-      this.toggleTheme();
-      document.getElementById('btn-theme').textContent = Storage.getTheme() === 'dark' ? '☀️' : '🌙';
-    });
     document.getElementById('btn-sync').addEventListener('click', () => showSyncModal());
     document.getElementById('btn-bored').addEventListener('click', () => this.renderBored());
     document.getElementById('btn-hotnot-home').addEventListener('click', () => this.navigate('hotnot'));
@@ -1170,10 +1157,8 @@ const App = {
       document.querySelectorAll('.home-media-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const mediaType = tab.dataset.media;
-      // Hide mood chips and daily card for TV
-      const moodSection = document.querySelector('.mood-section');
+      // Hide daily card for TV
       const dailySlot = document.getElementById('daily-slot');
-      if (moodSection) moodSection.style.display = mediaType === 'tv' ? 'none' : '';
       if (dailySlot) dailySlot.style.display = mediaType === 'tv' ? 'none' : '';
       this._loadMainCategories(mediaType);
     });
@@ -1190,11 +1175,13 @@ const App = {
       // FIX #13: clicking active genre deselects it → show all
       if (alreadyActive && genreId) {
         document.querySelector('.mood-chip[data-genre=""]').classList.add('active');
+        updateMoodGlow();
         this._loadMainCategories();
         return;
       }
 
       chip.classList.add('active');
+      updateMoodGlow();
       if (!genreId) {
         this._loadMainCategories();
       } else {
@@ -1206,6 +1193,26 @@ const App = {
         attachCategoryEvents('main-cats');
       }
     });
+
+    // Glow efekt za aktivním mood chipem — přetéká overflow kontejner
+    const updateMoodGlow = () => {
+      const chip = document.querySelector('.mood-chip.active');
+      const glow = document.getElementById('mood-glow');
+      const section = document.querySelector('.mood-section');
+      if (!chip || !glow || !section) return;
+      const cr = chip.getBoundingClientRect();
+      const sr = section.getBoundingClientRect();
+      const p = 6;
+      glow.style.left = (cr.left - sr.left - p) + 'px';
+      glow.style.top = (cr.top - sr.top - p) + 'px';
+      glow.style.width = (cr.width + p * 2) + 'px';
+      glow.style.height = (cr.height + p * 2) + 'px';
+      glow.classList.add('visible');
+    };
+    // Inicializace po načtení a sledování scrollu
+    setTimeout(updateMoodGlow, 50);
+    document.getElementById('mood-chips')?.addEventListener('scroll', updateMoodGlow, { passive: true });
+    window.addEventListener('resize', updateMoodGlow, { passive: true });
 
     // Daily
     API.getDailyMovie().then(movie => {
@@ -1528,9 +1535,29 @@ const App = {
 
   },
 
-  _sortMovies(movies, sortBy) {
+  _sortMovies(movies, sortBy, query = '') {
     const m = [...movies];
-    if (sortBy === 'rating_desc') m.sort((a,b) => b.rating - a.rating);
+    if (sortBy === 'relevance' && query.trim()) {
+      const q = query.toLowerCase().trim();
+      m.sort((a, b) => {
+        const ta = (a.title || '').toLowerCase();
+        const tb = (b.title || '').toLowerCase();
+        const score = (title, q) => {
+          if (title === q) return 5;              // exact match
+          if (title.startsWith(q)) return 4;       // starts with
+          if (title.includes(q)) return 3;         // contains
+          if (q.split(' ').some(w => title.includes(w))) return 2; // partial word
+          return 1;                                  // weak match
+        };
+        let sa = score(ta, q);
+        let sb = score(tb, q);
+        if (sa !== sb) return sb - sa;
+        // Stejná shoda — rozhodne popularita (vote_count) a rating
+        const pa = (a.vote_count || 0) + (a.rating || 0) * 100;
+        const pb = (b.vote_count || 0) + (b.rating || 0) * 100;
+        return pb - pa;
+      });
+    } else if (sortBy === 'rating_desc') m.sort((a,b) => b.rating - a.rating);
     else if (sortBy === 'rating_asc')  m.sort((a,b) => a.rating - b.rating);
     else if (sortBy === 'year_desc')   m.sort((a,b) => (b.year||'').localeCompare(a.year||''));
     else if (sortBy === 'year_asc')    m.sort((a,b) => (a.year||'').localeCompare(b.year||''));
@@ -1570,7 +1597,7 @@ const App = {
           }
         }
       }
-      movies = this._sortMovies(movies, st.sortBy);
+      movies = this._sortMovies(movies, st.sortBy, query);
 
       if (!movies.length) {
         res.innerHTML = `
@@ -1641,7 +1668,7 @@ const App = {
   // ════════════════════════════════════════════════
   //  FAVORITES
   // ════════════════════════════════════════════════
-  _favState: { sortBy: 'added', filterLabel: null, filterCollection: null, calendarView: false, showStats: false },
+  _favState: { sortBy: 'added', filterLabel: null, calendarView: false, showStats: false },
 
   renderFavorites() {
     const s = document.getElementById('screen');
@@ -1650,17 +1677,12 @@ const App = {
     const watchedIds = Storage.getWatchedIds();
     const stats = Storage.getStats();
     const progress = stats.total > 0 ? stats.watched / stats.total : 0;
-    const collections = Storage.getCollections();
     const labels = Storage.getLabels();
     const ratings = Storage.getAllRatings();
     const genres = this.genreCache;
 
     // Filter + sort
     let filtered = [...favs];
-    if (st.filterCollection) {
-      const col = collections.find(c => c.id === st.filterCollection);
-      if (col) filtered = filtered.filter(m => col.movieIds.includes(m.imdbId));
-    }
     if (st.filterLabel) filtered = filtered.filter(m => labels[m.imdbId] === st.filterLabel);
     if (st.sortBy === 'title')   filtered.sort((a,b) => a.title.localeCompare(b.title));
     if (st.sortBy === 'rating')  filtered.sort((a,b) => (ratings[b.imdbId]||0) - (ratings[a.imdbId]||0));
@@ -1677,7 +1699,6 @@ const App = {
           <button class="btn btn--icon" id="btn-calendar" title="Kalendář">${st.calendarView?'🔲':'📅'}</button>
           <button class="btn btn--icon" id="btn-stats" title="Statistiky">📊</button>
           <button class="btn btn--icon" id="btn-share" title="Sdílet">🔗</button>
-          <button class="btn btn--icon" id="btn-new-col" title="Nová kolekce">📁+</button>
           <button class="btn btn--icon" id="btn-new-label" title="Nový štítek">🏷️+</button>
         </div>
         ${stats.total > 0 ? `
@@ -1696,11 +1717,21 @@ const App = {
             <option value="year"    ${st.sortBy==='year'   ?'selected':''}>Rok</option>
             <option value="watched" ${st.sortBy==='watched'?'selected':''}>Neshlédnuté první</option>
           </select>
+          <div class="labels-row">
+            <div class="label-filter ${!st.filterLabel?'active':''}" data-label=""
+                 style="background:rgba(255,255,255,.08);color:var(--text2);border-color:${!st.filterLabel?'var(--accent)':'transparent'}">Vše</div>
+            ${Object.entries(getAllLabelDefs()).filter(([key]) => !getHiddenLabelKeys().has(key)).map(([key, def]) => {
+              const isCustom = key.startsWith('custom_');
+              return `<div class="label-filter ${st.filterLabel===key?'active':''}" data-label="${key}"
+                   style="background:${def.color}22;color:${def.color};border-color:${st.filterLabel===key?def.color:'transparent'}">
+                ${def.label}
+                <span class="label-del-btn" data-del-label="${key}" title="Smazat štítek" style="margin-left:6px;opacity:.5;font-size:11px;cursor:pointer;line-height:1">✕</span>
+              </div>`;
+            }).join('')}
+          </div>
           <span style="margin-left:auto;color:var(--accent);font-size:12px;font-weight:600">${movieCountLabel(filtered.length)}</span>
         </div>
-      </div>
 
-      <!-- Stats panel -->
       <div class="stats-panel ${st.showStats?'open':''}" id="stats-panel">
         <div class="stats-grid">
           ${[['Celkem',stats.total],['Viděno',stats.watched],['Zbývá',stats.notWatched],
@@ -1708,31 +1739,6 @@ const App = {
              ['Ø rok',stats.avgYear||'-'],['Top žánr',topGenre]
             ].map(([l,v]) => `<div class="stat-item"><div class="stat-item__val">${v}</div><div class="stat-item__label">${l}</div></div>`).join('')}
         </div>
-      </div>
-
-      <!-- Collections -->
-      ${collections.length ? `
-        <div class="collections-row">
-          <div class="col-chip ${!st.filterCollection?'active':''}" data-col="">📚 Vše</div>
-          ${collections.map(c => `
-            <div class="col-chip ${st.filterCollection===c.id?'active':''}" data-col="${c.id}">
-              ${escHtml(c.name)}
-              <span class="col-chip__del" data-del="${c.id}">✕</span>
-            </div>`).join('')}
-        </div>` : ''}
-
-      <!-- Label filters -->
-      <div class="labels-row">
-        <div class="label-filter ${!st.filterLabel?'active':''}" data-label=""
-             style="background:rgba(255,255,255,.08);color:var(--text2);border-color:${!st.filterLabel?'var(--accent)':'transparent'}">Vše</div>
-        ${Object.entries(getAllLabelDefs()).filter(([key]) => !getHiddenLabelKeys().has(key)).map(([key, def]) => {
-          const isCustom = key.startsWith('custom_');
-          return `<div class="label-filter ${st.filterLabel===key?'active':''}" data-label="${key}"
-               style="background:${def.color}22;color:${def.color};border-color:${st.filterLabel===key?def.color:'transparent'}">
-            ${def.label}
-            <span class="label-del-btn" data-del-label="${key}" title="Smazat štítek" style="margin-left:6px;opacity:.5;font-size:11px;cursor:pointer;line-height:1">✕</span>
-          </div>`;
-        }).join('')}
       </div>
 
       <!-- Content -->
@@ -1748,7 +1754,7 @@ const App = {
           </div>`}
       </div>`;
 
-    this._attachFavEvents(filtered, collections);
+    this._attachFavEvents(filtered);
   },
 
   _emptyFavs() {
@@ -1770,11 +1776,11 @@ const App = {
     return `<div class="calendar-view">` + sorted.map(([year, mms]) => `
       <div class="cal-year">${year}</div>
       <div class="cal-row">
-        ${mms.map(m => `<div style="flex-shrink:0;width:100px">${movieCard(m, { watchedToggle: true })}</div>`).join('')}
+        ${mms.map(m => `<div style="flex-shrink:0;width:var(--card-w)">${movieCard(m)}</div>`).join('')}
       </div>`).join('') + '</div>';
   },
 
-  _attachFavEvents(filtered, collections) {
+  _attachFavEvents(filtered) {
     const st = this._favState;
 
     document.getElementById('fav-sort')?.addEventListener('change', e => { st.sortBy = e.target.value; this.renderFavorites(); });
@@ -1786,16 +1792,7 @@ const App = {
     });
     document.getElementById('btn-calendar')?.addEventListener('click', () => { st.calendarView = !st.calendarView; this.renderFavorites(); });
     document.getElementById('btn-stats')?.addEventListener('click', () => { st.showStats = !st.showStats; document.getElementById('stats-panel')?.classList.toggle('open', st.showStats); });
-    document.getElementById('btn-share')?.addEventListener('click', async () => {
-      const token = Storage.generateShareToken();
-      const url = `${location.href.split('#')[0]}#share=${token}`;
-      await navigator.clipboard?.writeText(url);
-      showToast('🔗 Link zkopírován do schránky!');
-    });
-    document.getElementById('btn-new-col')?.addEventListener('click', async () => {
-      const name = await promptDialog('Název nové kolekce:', 'např. Akce na víkend');
-      if (name) { Storage.createCollection(name); this.renderFavorites(); }
-    });
+    document.getElementById('btn-share')?.addEventListener('click', () => showSyncModal());
     // FIX #27: create custom label
     document.getElementById('btn-new-label')?.addEventListener('click', () => {
       const colors = ['#E53935','#FF6D00','#F9A825','#43A047','#00ACC1','#1E88E5','#5E35B1','#EC407A','#546E7A'];
@@ -1841,14 +1838,6 @@ const App = {
       });
     });
 
-    // Collections
-    document.querySelector('.collections-row')?.addEventListener('click', e => {
-      const chip = e.target.closest('[data-col]');
-      const del = e.target.closest('[data-del]');
-      if (del) { e.stopPropagation(); Storage.deleteCollection(del.dataset.del); st.filterCollection = null; this.renderFavorites(); return; }
-      if (chip) { st.filterCollection = chip.dataset.col || null; this.renderFavorites(); }
-    });
-
     // Label filter + delete
     document.querySelector('.labels-row')?.addEventListener('click', e => {
       const delBtn = e.target.closest('[data-del-label]');
@@ -1873,7 +1862,7 @@ const App = {
     // Context menu — dispatched from ui.js via custom event
     document.addEventListener('card-ctx-menu', e => {
       if (!document.getElementById('favs-content')) return; // only active on fav screen
-      this._showCtxMenu(e.detail.event, e.detail.movie, collections);
+      this._showCtxMenu(e.detail.event, e.detail.movie);
     }, { once: false });
     // Also handle direct clicks (fallback)
     grid?.addEventListener('click', e => {
@@ -1881,18 +1870,18 @@ const App = {
       if (!btn) return;
       e.stopPropagation();
       let movie; try { movie = JSON.parse(btn.dataset.movie || '{}'); } catch { return; }
-      this._showCtxMenu(e, movie, collections);
+      this._showCtxMenu(e, movie);
     });
   },
 
-  _showCtxMenu(e, movie, collections) {
+  _showCtxMenu(e, movie) {
     document.querySelector('.ctx-menu')?.remove();
     const menu = document.createElement('div');
     menu.className = 'ctx-menu';
     menu.innerHTML = `
+      <div class="ctx-menu-item" data-act="watched">${Storage.isWatched(movie.imdbId) ? '👁️ Označit jako neshlédnuté' : '👁️ Označit jako shlédnuté'}</div>
       <div class="ctx-menu-item" data-act="similar">✨ Podobné filmy</div>
       <div class="ctx-menu-item" data-act="music">🎵 Soundtrack (YouTube)</div>
-      ${collections.length ? `<div class="ctx-menu-item" data-act="collection">📁 Do kolekce</div>` : ''}
       <div class="ctx-menu-item" data-act="label">🏷️ Štítek</div>
       <div class="ctx-menu-item" data-act="remove" style="color:var(--red)">🗑️ Odebrat</div>`;
     menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
@@ -1942,13 +1931,11 @@ const App = {
         const q = encodeURIComponent(`${movie.title} ${movie.year} official soundtrack`);
         window.open(`https://www.youtube.com/results?search_query=${q}`, '_blank');
       }
-      if (act === 'collection') {
-        const opts = collections.map(c => `<div class="ctx-menu-item" data-col="${c.id}">${escHtml(c.name)}</div>`).join('');
-        const m2 = showModal(opts, { title: 'Přidat do kolekce' });
-        m2.querySelector('.modal-body').addEventListener('click', ev2 => {
-          const chip = ev2.target.closest('[data-col]');
-          if (chip) { Storage.addToCollection(chip.dataset.col, movie.imdbId); m2.remove(); showToast('📁 Přidáno do kolekce'); }
-        });
+      if (act === 'watched') {
+        const now = Storage.toggleWatched(movie.imdbId);
+        if (now && !Storage.isFavorite(movie.imdbId)) Storage.saveFavorite(movie);
+        document.dispatchEvent(new CustomEvent('favorites-changed'));
+        this.renderFavorites();
       }
       if (act === 'label') {
         // FIX #8: inline label picker — quick color dots, no modal
@@ -2242,6 +2229,48 @@ const App = {
       document.getElementById('hon-save').addEventListener('click', () => decide(true));
       document.getElementById('hon-detail').addEventListener('click', () => openMovieDetail(movies[current]));
       document.getElementById('hon-card').addEventListener('click', () => openMovieDetail(movies[current]));
+
+      // Touch swipe pro mobil — přetažením prstem
+      (() => {
+        const card = document.getElementById('hon-card');
+        if (!card) return;
+        let startX = 0, startY = 0, dragging = false;
+        const SWIPE_THRESHOLD = 80;
+        const onStart = (e) => {
+          const t = e.touches[0];
+          if (!t) return;
+          startX = t.clientX; startY = t.clientY;
+          dragging = true;
+          card.style.transition = 'none';
+        };
+        const onMove = (e) => {
+          if (!dragging) return;
+          const t = e.touches[0];
+          if (!t) return;
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          const rot = Math.max(-15, Math.min(15, dx * 0.05));
+          card.style.transform = `translateX(${dx}px) rotate(${rot}deg)`;
+          card.style.opacity = Math.max(0.4, 1 - Math.abs(dx) / 500);
+        };
+        const onEnd = () => {
+          if (!dragging) return;
+          dragging = false;
+          const dx = parseFloat(card.style.transform?.match(/translateX\(([-\d.]+)px\)/)?.[1] || 0);
+          card.style.transition = 'transform .35s ease, opacity .35s ease';
+          if (dx > SWIPE_THRESHOLD) {
+            decide(true);
+          } else if (dx < -SWIPE_THRESHOLD) {
+            decide(false);
+          } else {
+            card.style.transform = ''; card.style.opacity = '';
+          }
+        };
+        card.addEventListener('touchstart', onStart, { passive: true });
+        card.addEventListener('touchmove', onMove, { passive: true });
+        card.addEventListener('touchend', onEnd);
+        card.addEventListener('touchcancel', onEnd);
+      })();
     };
     render();
   },

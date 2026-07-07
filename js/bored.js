@@ -48,6 +48,10 @@ class BoredGrid {
     this.canvas.removeEventListener('mousemove', this._onMove);
     this.canvas.removeEventListener('mouseleave', this._onLeave);
     this.canvas.removeEventListener('click', this._onClick);
+    this.canvas.removeEventListener('touchstart', this._onTouchStart);
+    this.canvas.removeEventListener('touchmove', this._onTouchMove);
+    this.canvas.removeEventListener('touchend', this._onTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this._onTouchEnd);
     window.removeEventListener('resize', this._onResize);
   }
 
@@ -84,11 +88,41 @@ class BoredGrid {
     this._onMove   = e => this._handleMove(e);
     this._onLeave  = () => this._handleLeave();
     this._onClick  = e => this._handleClick(e);
+    this._onTouchStart = e => { e.preventDefault(); this._syncTouch(e); };
+    this._onTouchMove  = e => { e.preventDefault(); this._syncTouch(e); };
+    this._onTouchEnd   = e => { this._handleClick({ clientX: this.mouse.x, clientY: this.mouse.y }); this._handleLeave(); };
     this._onResize = () => this._setupGrid();
     this.canvas.addEventListener('mousemove',  this._onMove,  { passive: true });
     this.canvas.addEventListener('mouseleave', this._onLeave, { passive: true });
     this.canvas.addEventListener('click',      this._onClick);
+    this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove',  this._onTouchMove,  { passive: false });
+    this.canvas.addEventListener('touchend',   this._onTouchEnd);
+    this.canvas.addEventListener('touchcancel', this._onTouchEnd);
     window.addEventListener('resize', this._onResize);
+  }
+
+  _syncTouch(e) {
+    const t = e.touches[0];
+    if (!t) return;
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = t.clientX - rect.left;
+    this.mouse.y = t.clientY - rect.top;
+    const newHot = this._closestIdx(this.mouse.x, this.mouse.y);
+    if (newHot !== this._prevHot) {
+      this._prevHot = newHot;
+    }
+    this.hoveredIdx = newHot;
+    for (let i = 0; i < this.total; i++) {
+      const ts = this._scaleFor(i);
+      const to = this._opFor(i);
+      if (ts > this.MIN_SCALE || i in this.scales) {
+        this.targetSc[i] = ts;
+        if (!(i in this.scales)) this.scales[i] = this.MIN_SCALE;
+      }
+      this.targetOp[i] = to;
+      if (!(i in this.opacities)) this.opacities[i] = this.OP_IDLE;
+    }
   }
 
   _cx(i) { return (i % this.cols) * this.cellW + this.cellW / 2; }

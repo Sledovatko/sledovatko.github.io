@@ -35,6 +35,7 @@ const API = (() => {
       posterUrl: poster(j.poster_path),
       backdropUrl: backdrop(j.backdrop_path),
       rating: votes >= 10 ? (j.vote_average || 0) : 0,
+      vote_count: votes,
       overview: j.overview || '',
       genreIds: j.genre_ids || [],
       releaseDate: release,
@@ -44,8 +45,22 @@ const API = (() => {
 
   const fetchPage = async (endpoint, page = 1) => {
     const sep = endpoint.includes('?') ? '&' : '?';
-    const data = await get(`${endpoint}${sep}language=cs-CZ&page=${page}`);
-    return (data.results || []).map(j => parseMovie(j));
+    const [csData, skData, enData] = await Promise.all([
+      get(`${endpoint}${sep}language=cs-CZ&page=${page}`).catch(() => ({results:[]})),
+      get(`${endpoint}${sep}language=sk-SK&page=${page}`).catch(() => ({results:[]})),
+      get(`${endpoint}${sep}language=en-US&page=${page}`).catch(() => ({results:[]})),
+    ]);
+    let results = (csData.results || []).map(j => parseMovie(j));
+    [skData, enData].forEach(fb => {
+      const fbMap = new Map((fb.results || []).map(j => [j.id, j]));
+      for (const m of results) {
+        if (!m.overview) {
+          const fbMovie = fbMap.get(Number(m.imdbId));
+          if (fbMovie?.overview) m.overview = fbMovie.overview;
+        }
+      }
+    });
+    return results;
   };
 
   const fetchMultiPage = async (endpoint, pages = 3) => {
@@ -218,8 +233,21 @@ const API = (() => {
         return results;
       }
       const type = searchTV ? 'tv' : 'movie';
-      const data = await get(`/search/${type}?query=${encodeURIComponent(query)}&language=cs-CZ&page=${page}`);
-      let results = (data.results || []).map(j => parseMovie(j, type));
+      const [csData, skData, enData] = await Promise.all([
+        get(`/search/${type}?query=${encodeURIComponent(query)}&language=cs-CZ&page=${page}`).catch(() => ({results:[]})),
+        get(`/search/${type}?query=${encodeURIComponent(query)}&language=sk-SK&page=${page}`).catch(() => ({results:[]})),
+        get(`/search/${type}?query=${encodeURIComponent(query)}&language=en-US&page=${page}`).catch(() => ({results:[]})),
+      ]);
+      let results = (csData.results || []).map(j => parseMovie(j, type));
+      [skData, enData].forEach(fb => {
+        const fbMap = new Map((fb.results || []).map(j => [j.id, j]));
+        for (const m of results) {
+          if (!m.overview) {
+            const fbMovie = fbMap.get(Number(m.imdbId));
+            if (fbMovie?.overview) m.overview = fbMovie.overview;
+          }
+        }
+      });
       if (yearFrom)  results = results.filter(m => parseInt(m.year) >= yearFrom);
       if (yearTo)    results = results.filter(m => parseInt(m.year) <= yearTo);
       if (minRating) results = results.filter(m => m.rating >= minRating);
