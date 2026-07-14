@@ -441,6 +441,17 @@ mark{background:rgba(0,201,167,.25);color:var(--accent);font-weight:700;border-r
   .detail-hero__content{flex-direction:column}
 }
 
+/* iPhone 13 mini (375 × 812): keep 3 clearly readable columns in the drawer. */
+@media(max-width:390px) and (max-height:850px){
+  .favorites-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px 10px;
+    padding:12px;
+  }
+  .favorites-grid .movie-card-wrap,
+  .favorites-grid .movie-card{width:100%;min-width:0}
+}
+
 /* ── Action buttons row (Bored + Hot or Not side by side) ── */
 .action-btns-row{display:flex;gap:10px;margin:0 20px 0}
 .action-btns-row .bored-btn{flex:1;margin:0}
@@ -1740,7 +1751,7 @@ const App = {
         ${filtered.length === 0 && favs.length === 0 ? this._emptyFavs() :
           filtered.length === 0 ? '<div class="empty-state"><div class="empty-state__icon">🔍</div><div class="empty-state__title">Žádné filmy v tomto filtru</div></div>' :
           st.calendarView ? this._buildCalendarView(filtered) :
-          `<div class="movie-grid">
+          `<div class="movie-grid favorites-grid">
             ${filtered.map(m => `
               <div class="movie-card-wrap" data-id="${m.imdbId}">
                 ${movieCard(m, { ctxBtn: { id: m.imdbId, data: JSON.stringify(m) }, watchedToggle: true })}
@@ -2139,7 +2150,7 @@ const App = {
 
   },
 
-  // ════════════════════════════════════════════════
+  // ═══════════════════���════════════════════════════
   //  HOT OR NOT
   // ════════════════════════════════════════════════
   renderHotOrNot(movies) {
