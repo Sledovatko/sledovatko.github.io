@@ -12,6 +12,56 @@ function showToast(message, duration = 2500) {
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, duration);
 }
 
+// Spodní oznámení po odebrání filmu. Po dobu 6,5 s nabízí vrácení změny
+// a vizuálně odpočítává zbývající čas.
+function showUndoToast(movie, onUndo, duration = 6500) {
+  const existing = document.querySelector('.wm-undo-toast');
+  if (existing) {
+    clearTimeout(existing._removeTimer);
+    existing.remove();
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'wm-undo-toast';
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
+  toast.innerHTML = `
+    <div class="wm-undo-toast__content">
+      <div class="wm-undo-toast__message"><strong>${escHtml(movie.title)}</strong> byl odebrán</div>
+      <button class="wm-undo-toast__button" type="button">Vrátit změny</button>
+    </div>
+    <div class="wm-undo-toast__track"><div class="wm-undo-toast__progress"></div></div>`;
+  document.body.appendChild(toast);
+
+  const close = () => {
+    clearTimeout(toast._removeTimer);
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 220);
+  };
+  toast.querySelector('.wm-undo-toast__button').addEventListener('click', () => {
+    onUndo?.();
+    close();
+  });
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+    const progress = toast.querySelector('.wm-undo-toast__progress');
+    progress.style.transitionDuration = `${duration}ms`;
+    requestAnimationFrame(() => { progress.style.transform = 'scaleX(0)'; });
+  });
+  toast._removeTimer = setTimeout(close, duration);
+}
+
+function removeFavoriteWithUndo(movie, { onRemove, onUndo } = {}) {
+  Storage.removeFavorite(movie.imdbId);
+  onRemove?.();
+  document.dispatchEvent(new CustomEvent('favorites-changed'));
+  showUndoToast(movie, () => {
+    Storage.saveFavorite(movie);
+    onUndo?.();
+    document.dispatchEvent(new CustomEvent('favorites-changed'));
+  });
+}
+
 function showModal(contentHTML, opts = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -62,6 +112,9 @@ function spinner(text = 'Načítám...') {
 // ── Movie card ────────────────────────────────────────────────────────────────
 function movieCard(movie, opts = {}) {
   const isFav     = Storage.isFavorite(movie.imdbId);
+  const isWatched = Storage.isWatched(movie.imdbId);
+  const tvProgress = movie.mediaType === 'tv' ? Storage.getTVProgress(movie.imdbId) : null;
+  const cachedRuntime = Storage.getMediaRuntime(movie.mediaType || 'movie', movie.imdbId);
   const rating    = Storage.getRating(movie.imdbId);
   const label     = Storage.getLabels()[movie.imdbId];
   const allDefs   = getAllLabelDefs();
@@ -82,12 +135,14 @@ function movieCard(movie, opts = {}) {
     : '';
 
   return `
-  <div class="movie-card" data-id="${movie.imdbId}" data-movie='${JSON.stringify(movie).replace(/'/g,"&#39;")}'>
+  <div class="movie-card ${isWatched ? 'movie-card--watched' : ''}" data-id="${movie.imdbId}" data-movie='${JSON.stringify(movie).replace(/'/g,"&#39;")}'>
     <div class="movie-card__poster-wrap">
       ${movie.posterUrl
         ? `<img class="movie-card__poster" src="${movie.posterUrl}" alt="${escHtml(movie.title)}" loading="lazy">`
         : `<div class="movie-card__placeholder"><span>🎬</span></div>`}
       ${labelDef ? `<div class="movie-card__label-strip" style="background:${labelDef.color}"></div>` : ''}
+      <div class="movie-card__watched-overlay" aria-hidden="true"></div>
+      <div class="movie-card__watched-badge ${opts.ctxBtn ? 'movie-card__watched-badge--compact' : ''}"><span class="movie-card__watched-icon">✓</span><span class="movie-card__watched-text">Shlédnuto</span></div>
       <div class="movie-card__hover-overlay">
         <button class="btn btn--quick-add ${isFav ? 'active' : ''}" data-action="quick-add"
           style="transition:background .35s ease,color .35s ease,opacity .12s ease,transform .12s ease">
@@ -100,11 +155,17 @@ function movieCard(movie, opts = {}) {
     <div class="movie-card__title" title="${escHtml(movie.title)}">${titleHtml}</div>
     <div class="movie-card__meta">
       <span class="movie-card__year">${movie.year}</span>
+      <span class="movie-card__runtime">${cachedRuntime ? `· ${formatCardRuntime(cachedRuntime, movie.mediaType || 'movie')}` : ''}</span>
       <span class="movie-card__rating">
         ${ratingDisplay}
         ${rating ? `<span class="personal-rating">👤 ${rating}</span>` : ''}
       </span>
     </div>
+    ${tvProgress && tvProgress.watched > 0 && !isWatched ? `
+      <div class="movie-card__series-progress" aria-label="Shlédnuto ${tvProgress.watched} z ${tvProgress.total} epizod">
+        <div class="movie-card__series-progress-row"><span>${tvProgress.watched}/${tvProgress.total} dílů</span><span>${tvProgress.percent}%</span></div>
+        <div class="movie-card__series-progress-track"><div style="width:${tvProgress.percent}%"></div></div>
+      </div>` : ''}
   </div>`;
 }
 
@@ -116,6 +177,24 @@ function formatRelease(dateStr) {
   if (diff === 1) return 'Zítra';
   if (diff > 0 && diff <= 7) return `Za ${diff} dní`;
   return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`;
+}
+
+function formatRuntime(totalMinutes) {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  if (!minutes) return '';
+  if (minutes < 60) return `${minutes} min`;
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days) return `${days} d ${hours ? `${hours} h` : ''}${mins ? ` ${mins} min` : ''}`.trim();
+  return `${hours} h${mins ? ` ${mins} min` : ''}`;
+}
+
+function formatCardRuntime(totalMinutes, mediaType = 'movie') {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  if (!minutes) return '';
+  if (mediaType === 'tv') return `${Math.round(minutes / 60)} h`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
 function highlightText(text, query) {
@@ -258,6 +337,7 @@ function attachCardEvents(container, opts = {}) {
         if (!card._hoverActive) return;
         if (!document.body.contains(card)) return; // card may have been removed
         let movie; try { movie = JSON.parse(card.dataset.movie); } catch { return; }
+        ensureCardRuntime(card, movie).catch(() => {});
         await showMiniTrailer(card, movie);
       }, 2000);
     });
@@ -323,16 +403,32 @@ function attachCardEvents(container, opts = {}) {
       const actionEl = e.target.closest('[data-action]');
       const action = actionEl?.dataset.action;
       let movie; try { movie = JSON.parse(card.dataset.movie); } catch { return; }
+      const touchLike = window.matchMedia?.('(hover: none), (pointer: coarse)').matches;
 
       if (action === 'quick-add') {
         e.stopPropagation();
         hideMiniTrailer(card); // always kill preview on any button click
         const isFav = Storage.isFavorite(movie.imdbId);
-        if (isFav) Storage.removeFavorite(movie.imdbId); else Storage.saveFavorite(movie);
-        const newState = !isFav;
-        document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => updateCardFavState(c, newState));
-        showToast(newState ? `🔖 ${movie.title} přidán` : `❌ ${movie.title} odebrán`);
-        document.dispatchEvent(new CustomEvent('favorites-changed'));
+        // Na dotykovém zařízení nesmí neviditelné tlačítko titul okamžitě smazat.
+        // První klepnutí pouze odkryje akce; odebrání provede až další klepnutí.
+        if (touchLike && isFav && !card.classList.contains('mobile-primed')) {
+          container.querySelectorAll('.movie-card.mobile-primed').forEach(c => c.classList.remove('mobile-primed'));
+          card.classList.add('mobile-primed');
+          ensureCardRuntime(card, movie).catch(() => {});
+          actionEl.textContent = '✕ Odebrat';
+          return;
+        }
+        if (isFav) {
+          removeFavoriteWithUndo(movie, {
+            onRemove: () => document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => updateCardFavState(c, false)),
+            onUndo: () => document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => updateCardFavState(c, true)),
+          });
+        } else {
+          Storage.saveFavorite(movie);
+          document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"]`).forEach(c => updateCardFavState(c, true));
+          showToast(`🔖 ${movie.title} přidán`);
+          document.dispatchEvent(new CustomEvent('favorites-changed'));
+        }
       } else if (action === 'ctx-menu') {
         e.stopPropagation();
         hideMiniTrailer(card);
@@ -340,6 +436,12 @@ function attachCardEvents(container, opts = {}) {
         document.dispatchEvent(new CustomEvent('card-ctx-menu', { detail: { event: e, movie: m } }));
       } else if (!action) {
         hideMiniTrailer(card);
+        if (touchLike && !card.classList.contains('mobile-primed')) {
+          container.querySelectorAll('.movie-card.mobile-primed').forEach(c => c.classList.remove('mobile-primed'));
+          card.classList.add('mobile-primed');
+          ensureCardRuntime(card, movie).catch(() => {});
+          return;
+        }
         if (opts.onCardClick) opts.onCardClick(movie);
         else openMovieDetail(movie);
       }
@@ -381,6 +483,52 @@ function updateCardFavState(card, isFav) {
   _bindQuickAddHover(qa);
 }
 
+function updateCardWatchedState(card, isWatched) {
+  card?.classList.toggle('movie-card--watched', isWatched);
+}
+
+function syncMovieCardsWatched(imdbId, isWatched) {
+  document.querySelectorAll(`.movie-card[data-id="${imdbId}"]`)
+    .forEach(card => updateCardWatchedState(card, isWatched));
+}
+
+function syncMovieCardsProgress(imdbId) {
+  const progress = Storage.getTVProgress(imdbId);
+  document.querySelectorAll(`.movie-card[data-id="${imdbId}"]`).forEach(card => {
+    card.querySelector('.movie-card__series-progress')?.remove();
+    if (!progress || progress.watched <= 0 || Storage.isWatched(imdbId)) return;
+    const el = document.createElement('div');
+    el.className = 'movie-card__series-progress';
+    el.setAttribute('aria-label', `Shlédnuto ${progress.watched} z ${progress.total} epizod`);
+    el.innerHTML = `<div class="movie-card__series-progress-row"><span>${progress.watched}/${progress.total} dílů</span><span>${progress.percent}%</span></div>
+      <div class="movie-card__series-progress-track"><div style="width:${progress.percent}%"></div></div>`;
+    card.appendChild(el);
+  });
+}
+
+function syncMovieCardsRuntime(movie) {
+  const mediaType = movie.mediaType || 'movie';
+  const runtime = Storage.getMediaRuntime(mediaType, movie.imdbId);
+  if (!runtime) return;
+  document.querySelectorAll(`.movie-card[data-id="${movie.imdbId}"] .movie-card__runtime`).forEach(el => {
+    el.textContent = `· ${formatCardRuntime(runtime, mediaType)}`;
+  });
+}
+
+async function ensureCardRuntime(card, movie) {
+  const mediaType = movie.mediaType || 'movie';
+  if (Storage.getMediaRuntime(mediaType, movie.imdbId)) { syncMovieCardsRuntime(movie); return; }
+  if (mediaType === 'tv' || card._runtimeLoading) return;
+  card._runtimeLoading = true;
+  try {
+    const details = await API.getMovieDetails(movie.id);
+    if (details.runtime) {
+      Storage.setMediaRuntime('movie', movie.imdbId, details.runtime);
+      syncMovieCardsRuntime(movie);
+    }
+  } finally { card._runtimeLoading = false; }
+}
+
 // ── Mini trailer — Netflix-style backdrop preview ─────────────────────────────
 let _miniPlayerActive = null;
 let _miniBox = null;
@@ -403,9 +551,11 @@ async function showMiniTrailer(card, movie) {
   let vimeoId = null;
   let backdropUrls = [];
   try {
+    const loadVideos = movie.mediaType === 'tv' ? API.getTVVideos : API.getMovieVideos;
+    const loadImages = movie.mediaType === 'tv' ? API.getTVImages : API.getMovieImages;
     const [videos, images] = await Promise.all([
-      API.getMovieVideos(movie.id).catch(() => []),
-      API.getMovieImages(movie.id).catch(() => []),
+      loadVideos(movie.id).catch(() => []),
+      loadImages(movie.id).catch(() => []),
     ]);
     const vim = videos.find(v => v.site === 'Vimeo' && v.type === 'Trailer') || videos.find(v => v.site === 'Vimeo');
     if (vim) vimeoId = vim.key;
@@ -549,6 +699,7 @@ async function openMovieDetail(movie) {
   const myComment = Storage.getComment(movie.imdbId);
 
   const overlay = showModal(`
+    <button class="detail-close" type="button" aria-label="Zavřít detail" title="Zavřít">✕</button>
     <div class="detail-hero" ${movie.backdropUrl ? `style="background-image:url('${movie.backdropUrl}')"` : ''}>
       <div class="detail-hero__gradient"></div>
       <div class="detail-hero__content">
@@ -559,6 +710,7 @@ async function openMovieDetail(movie) {
             ${movie.year ? `<span>${movie.year}</span>` : ''}
             ${movie.rating > 0 ? `<span>★ ${movie.rating.toFixed(1)}</span>` : ''}
             ${movie.mediaType === 'tv' ? '<span class="badge">Seriál</span>' : ''}
+            <span id="_detail-runtime" class="detail-runtime">${movie.mediaType === 'tv' ? '⏱ Počítám…' : ''}</span>
           </div>
           <div class="detail-actions">
             <button class="btn ${isFav ? 'btn--primary' : 'btn--ghost'}" id="_btn-fav">${isFav ? '❤️ Uloženo' : '🤍 Uložit'}</button>
@@ -589,7 +741,7 @@ async function openMovieDetail(movie) {
         <div id="_ep-list" class="ep-list"><div class="spinner" style="width:28px;height:28px;margin:24px auto;border-width:3px"></div></div>
       </div>` : ''}
       <div class="detail-section" id="_gallery-section" style="display:none">
-        <h3>Záběry z filmu</h3>
+        <h3>Obrázky</h3>
         <div class="gallery-wrap">
           <button class="gallery-arrow gallery-arrow--left" id="_gal-left">‹</button>
           <div class="gallery" id="_gallery"></div>
@@ -612,26 +764,56 @@ async function openMovieDetail(movie) {
     </div>
   `, { wide: true, tall: true });
 
+  overlay.querySelector('.detail-close').addEventListener('click', () => overlay.remove());
+
+  // Stopáž filmu se načítá až v detailu, aby karty a hover náhledy nedělaly
+  // stovky zbytečných API požadavků.
+  if (movie.mediaType !== 'tv') {
+    API.getMovieDetails(movie.id).then(details => {
+      const el = overlay.querySelector('#_detail-runtime');
+      if (details.runtime) {
+        Storage.setMediaRuntime('movie', movie.imdbId, details.runtime);
+        syncMovieCardsRuntime(movie);
+      }
+      if (el) el.textContent = details.runtime ? `⏱ ${formatRuntime(details.runtime)}` : '';
+    }).catch(() => {});
+  }
+
   overlay.querySelector('#_detail-title').addEventListener('click', () => {
     navigator.clipboard?.writeText(movie.title);
     showToast('📋 Název zkopírován');
   });
 
   const favBtn = overlay.querySelector('#_btn-fav');
+  const setFavButton = (saved) => {
+    if (!document.body.contains(favBtn)) return;
+    favBtn.textContent = saved ? '❤️ Uloženo' : '🤍 Uložit';
+    favBtn.className = `btn ${saved ? 'btn--primary' : 'btn--ghost'}`;
+  };
   favBtn.addEventListener('click', () => {
     const now = Storage.isFavorite(movie.imdbId);
-    if (now) Storage.removeFavorite(movie.imdbId); else Storage.saveFavorite(movie);
-    favBtn.textContent = now ? '🤍 Uložit' : '❤️ Uloženo';
-    favBtn.className   = `btn ${now ? 'btn--ghost' : 'btn--primary'}`;
-    document.dispatchEvent(new CustomEvent('favorites-changed'));
+    if (now) {
+      removeFavoriteWithUndo(movie, {
+        onRemove: () => setFavButton(false),
+        onUndo: () => setFavButton(true),
+      });
+    } else {
+      Storage.saveFavorite(movie);
+      setFavButton(true);
+      document.dispatchEvent(new CustomEvent('favorites-changed'));
+    }
   });
 
   const watchedBtn = overlay.querySelector('#_btn-watched');
   watchedBtn.addEventListener('click', () => {
     const now = Storage.toggleWatched(movie.imdbId);
-    if (now && !Storage.isFavorite(movie.imdbId)) Storage.saveFavorite(movie);
+    if (now && !Storage.isFavorite(movie.imdbId)) {
+      Storage.saveFavorite(movie);
+      setFavButton(true);
+    }
     watchedBtn.textContent = now ? '✓ Viděno' : '○ Neviděno';
     watchedBtn.className   = `btn ${now ? 'btn--success' : 'btn--ghost'}`;
+    syncMovieCardsWatched(movie.imdbId, now);
     document.dispatchEvent(new CustomEvent('favorites-changed'));
   });
 
@@ -639,7 +821,7 @@ async function openMovieDetail(movie) {
     const btn = overlay.querySelector('#_btn-trailer');
     btn.textContent = '⏳...'; btn.disabled = true;
     try {
-      const videos = await API.getMovieVideos(movie.id);
+      const videos = await (movie.mediaType === 'tv' ? API.getTVVideos(movie.id) : API.getMovieVideos(movie.id));
       const ytT = videos.find(v => v.site === 'YouTube' && v.type === 'Trailer') || videos.find(v => v.site === 'YouTube');
       const vim = videos.find(v => v.site === 'Vimeo' && v.type === 'Trailer') || videos.find(v => v.site === 'Vimeo');
       const videoKey = ytT?.key || vim?.key;
@@ -691,14 +873,14 @@ async function openMovieDetail(movie) {
         }
       } else {
         // No video found — show backdrop gallery or message
-        const images = await API.getMovieImages(movie.id).catch(() => []);
+        const images = await (movie.mediaType === 'tv' ? API.getTVImages(movie.id) : API.getMovieImages(movie.id)).catch(() => []);
         if (images.length) {
           const tOverlay = document.createElement('div');
           tOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px';
           let imgIdx = 0;
           const show6 = images.slice(0, 6);
           tOverlay.innerHTML = `
-            <div style="color:#fff;font-size:15px;font-weight:700">${escHtml(movie.title)} — záběry z filmu</div>
+            <div style="color:#fff;font-size:15px;font-weight:700">${escHtml(movie.title)} — obrázky</div>
             <img id="_trl-img" src="${show6[0]}" style="max-width:100%;max-height:60vh;border-radius:10px;object-fit:contain;transition:opacity .3s">
             <div style="display:flex;gap:6px">${show6.map((_,i)=>`<span class="_trl-dot" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,${i===0?'.9':'.3'});cursor:pointer;transition:background .2s"></span>`).join('')}</div>
             <button style="color:rgba(255,255,255,.6);font-size:13px;padding:8px 20px;border-radius:8px;background:rgba(255,255,255,.08);border:none;cursor:pointer">✕ Zavřít</button>`;
@@ -751,7 +933,7 @@ async function openMovieDetail(movie) {
       // Pages 1 and 2 from recommendations+similar, page 3+ via discover with same genres
       let batch = [];
       if (_simPage <= 2) {
-        batch = await API.getSmartSimilar(movie.id, movie.genreIds || []);
+        batch = await API.getSmartSimilar(movie.id, movie.genreIds || [], movie.mediaType || 'movie');
         _simHasMore = false; // getSmartSimilar returns full list in one shot
         const seen = new Set(_simMovies.map(m => m.imdbId));
         batch = batch.filter(m => !seen.has(m.imdbId));
@@ -847,9 +1029,10 @@ async function openMovieDetail(movie) {
     initSeriesEpisodes(overlay, movie).catch(() => {});
   }
 
-  // Galerie záběrů je endpoint /movie/* — pro seriály ji přeskočíme
-  if (movie.mediaType !== 'tv') try {
-    const images = await API.getMovieImages(movie.id);
+  // Galerie používá správný endpoint podle typu média. Číselná ID filmů a
+  // seriálů se mohou shodovat, proto je nelze zaměňovat.
+  try {
+    const images = await (movie.mediaType === 'tv' ? API.getTVImages(movie.id) : API.getMovieImages(movie.id));
     if (images.length) {
       const section  = overlay.querySelector('#_gallery-section');
       const gallery  = overlay.querySelector('#_gallery');
@@ -936,29 +1119,76 @@ async function initSeriesEpisodes(overlay, movie) {
   try { tv = await API.getTVDetails(movie.id); }
   catch { listEl.innerHTML = '<p class="ep-empty">Epizody se nepodařilo načíst.</p>'; return; }
   if (!tv.seasons.length) { listEl.innerHTML = '<p class="ep-empty">Tento seriál nemá dostupné epizody.</p>'; return; }
+  if (!Storage.getTVMeta(tvId)) Storage.setTVMeta(tvId, tv);
 
-  const totalEpisodes = tv.numberOfEpisodes || tv.seasons.reduce((a, s) => a + s.episodeCount, 0);
+  // Součet pouze běžných sezón; speciály (sezóna 0) se nezapočítávají.
+  const totalEpisodes = tv.seasons.reduce((a, s) => a + s.episodeCount, 0);
   const epCache = {};  // seasonNumber -> [episode objektů]
   const epNums  = {};  // seasonNumber -> [čísla epizod]
+  const seasonLoads = {};
+  let releaseDataReady = false;
   let current = tv.seasons[0].seasonNumber;
 
   const seasonByNum = (n) => tv.seasons.find(s => s.seasonNumber === n);
+  const getSeasonRuntime = (n) => (epCache[n] || []).reduce((sum, ep) => sum + (ep.runtime || 0), 0);
+  const releasedNums = (n) => (epCache[n] || []).filter(ep => ep.isReleased).map(ep => ep.episodeNumber);
+
+  const updateSeasonOption = (n) => {
+    const option = seasonSel.querySelector(`option[value="${n}"]`);
+    const season = seasonByNum(n);
+    if (!option || !season) return;
+    const runtime = getSeasonRuntime(n);
+    option.textContent = `${season.name} · ${season.episodeCount} dílů${runtime ? ` · ${formatRuntime(runtime)}` : ''}`;
+  };
+
+  const fetchSeason = async (n) => {
+    if (epCache[n]) return epCache[n];
+    if (!seasonLoads[n]) {
+      seasonLoads[n] = API.getSeasonDetails(movie.id, n)
+        .then(eps => {
+          epCache[n] = eps;
+          epNums[n] = eps.map(x => x.episodeNumber);
+          updateSeasonOption(n);
+          return eps;
+        })
+        .catch(() => {
+          epCache[n] = [];
+          epNums[n] = [];
+          return [];
+        });
+    }
+    return seasonLoads[n];
+  };
+
+  const getRegularWatchedCount = () => tv.seasons.reduce((sum, s) => {
+    const nums = releaseDataReady ? releasedNums(s.seasonNumber) : [];
+    return sum + Storage.getSeasonWatchedCount(tvId, s.seasonNumber, nums);
+  }, 0);
+
+  const getReleasedTotal = () => tv.seasons.reduce((sum, s) => sum + releasedNums(s.seasonNumber).length, 0);
 
   const refreshTopProgress = () => {
-    const w = Storage.getWatchedEpisodeCount(tvId);
-    progEl.style.width = (totalEpisodes ? Math.round(w / totalEpisodes * 100) : 0) + '%';
-    progLabel.textContent = `${w}/${totalEpisodes} epizod`;
+    const cached = !releaseDataReady ? Storage.getTVProgress(tvId) : null;
+    const w = cached ? cached.watched : getRegularWatchedCount();
+    const total = cached ? cached.total : (releaseDataReady ? getReleasedTotal() : totalEpisodes);
+    progEl.style.width = (total ? Math.round(w / total * 100) : 0) + '%';
+    progLabel.textContent = `${w}/${total} vydaných epizod`;
   };
   // Provázání: celý seriál je „Viděno", právě když jsou shlédnuté všechny epizody
   const syncSeriesWatched = () => {
-    const w = Storage.getWatchedEpisodeCount(tvId);
-    Storage.setWatched(tvId, totalEpisodes > 0 && w >= totalEpisodes);
+    if (!releaseDataReady) return;
+    const w = getRegularWatchedCount();
+    const releasedTotal = getReleasedTotal();
+    Storage.setWatched(tvId, releasedTotal > 0 && w >= releasedTotal);
     if (watchedBtn) {
       const on = Storage.isWatched(tvId);
       watchedBtn.textContent = on ? '✓ Viděno' : '○ Neviděno';
       watchedBtn.className    = `btn ${on ? 'btn--success' : 'btn--ghost'}`;
     }
+    syncMovieCardsWatched(tvId, Storage.isWatched(tvId));
+    syncMovieCardsProgress(tvId);
     document.dispatchEvent(new CustomEvent('favorites-changed'));
+    document.dispatchEvent(new CustomEvent('tv-progress-changed'));
   };
 
   // Automaticky uloží seriál do oblíbených při prvním shlédnutém dílu
@@ -970,7 +1200,7 @@ async function initSeriesEpisodes(overlay, movie) {
   };
 
   const updateMarkBtn = () => {
-    const nums = epNums[current] || [];
+    const nums = releasedNums(current);
     const wc = nums.length ? Storage.getSeasonWatchedCount(tvId, current, nums) : 0;
     const done = nums.length > 0 && wc >= nums.length;
     markBtn.classList.toggle('btn--success', done);
@@ -982,17 +1212,19 @@ async function initSeriesEpisodes(overlay, movie) {
     const eps = epCache[current] || [];
     const s = seasonByNum(current);
     if (!eps.length) { listEl.innerHTML = '<p class="ep-empty">Epizody se nepodařilo načíst.</p>'; return; }
-    const wc = epNums[current] ? Storage.getSeasonWatchedCount(tvId, current, epNums[current]) : 0;
-    const summary = `<div class="ep-season-summary">Shlédnuto <b>${wc}</b>/${eps.length}${s && s.airDate ? ` · ${s.airDate.substring(0, 4)}` : ''}</div>`;
+    const currentReleased = releasedNums(current);
+    const wc = Storage.getSeasonWatchedCount(tvId, current, currentReleased);
+    const seasonRuntime = getSeasonRuntime(current);
+    const summary = `<div class="ep-season-summary">Shlédnuto <b>${wc}</b>/${currentReleased.length} vydaných${s && s.airDate ? ` · ${s.airDate.substring(0, 4)}` : ''}${seasonRuntime ? ` · ⏱ ${formatRuntime(seasonRuntime)} celkem` : ''}</div>`;
     listEl.innerHTML = summary + '<div class="tv-episode-list">' + eps.map(ep => {
       const w = Storage.isEpisodeWatched(tvId, current, ep.episodeNumber);
       const date = ep.airDate ? new Date(ep.airDate).toLocaleDateString('cs-CZ') : '';
       return `
       <div class="tv-episode ${w ? 'tv-episode--watched' : ''}">
-        <button class="tv-ep-check ${w ? 'tv-ep-check--on' : ''}" data-ep="${ep.episodeNumber}" title="Označit jako shlédnuté">${w ? '✓' : '○'}</button>
+        <button class="tv-ep-check ${w ? 'tv-ep-check--on' : ''}" data-ep="${ep.episodeNumber}" ${ep.isReleased ? '' : 'disabled'} title="${ep.isReleased ? 'Označit jako shlédnuté' : 'Epizoda ještě nevyšla'}">${ep.isReleased ? (w ? '✓' : '○') : '◷'}</button>
         <div class="tv-ep-thumb ${ep.stillUrl ? '' : 'tv-ep-thumb--empty'}">${ep.stillUrl ? `<img src="${ep.stillUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:6px" loading="lazy">` : '📺'}</div>
         <div class="tv-ep-info">
-          <div class="tv-ep-num">${current}×${String(ep.episodeNumber).padStart(2, '0')}${date ? ` · ${date}` : ''}</div>
+          <div class="tv-ep-num">${current}×${String(ep.episodeNumber).padStart(2, '0')}${date ? ` · ${date}` : ''}${ep.runtime ? ` · ⏱ ${formatRuntime(ep.runtime)}` : ''}</div>
           <div class="tv-ep-titlerow"><span class="tv-ep-title">${escHtml(ep.name)}</span>${ep.rating > 0 ? `<span class="tv-ep-rating">★ ${ep.rating.toFixed(1)}</span>` : ''}</div>
           ${ep.overview ? `<p class="tv-ep-overview">${escHtml(ep.overview)}</p>` : '<p class="tv-ep-overview tv-ep-overview--empty">Popis epizody zatím není k dispozici.</p>'}
         </div>
@@ -1004,8 +1236,7 @@ async function initSeriesEpisodes(overlay, movie) {
     current = n;
     if (!epCache[n]) {
       listEl.innerHTML = '<div class="spinner" style="width:26px;height:26px;margin:24px auto;border-width:3px"></div>';
-      try { const eps = await API.getSeasonDetails(movie.id, n); epCache[n] = eps; epNums[n] = eps.map(x => x.episodeNumber); }
-      catch { epCache[n] = []; epNums[n] = []; }
+      await fetchSeason(n);
     }
     renderEpisodes();
     updateMarkBtn();
@@ -1022,7 +1253,7 @@ async function initSeriesEpisodes(overlay, movie) {
   // Označit / odznačit celou aktuální sérii
   markBtn.addEventListener('click', async () => {
     if (!epCache[current]) await loadSeason(current);
-    const nums = epNums[current] || [];
+    const nums = releasedNums(current);
     const turnOn = !Storage.isSeasonWatched(tvId, current, nums);
     Storage.setSeasonWatched(tvId, current, nums, turnOn);
     if (turnOn) autoFavIfNeeded();
@@ -1035,13 +1266,15 @@ async function initSeriesEpisodes(overlay, movie) {
     const chk = e.target.closest('.tv-ep-check');
     if (!chk) return;
     const epNum = +chk.dataset.ep;
+    const ep = (epCache[current] || []).find(x => x.episodeNumber === epNum);
+    if (!ep?.isReleased) return;
     const now = Storage.toggleEpisodeWatched(tvId, current, epNum);
     if (now) autoFavIfNeeded();
     chk.classList.toggle('tv-ep-check--on', now);
     chk.textContent = now ? '✓' : '○';
     chk.closest('.tv-episode')?.classList.toggle('tv-episode--watched', now);
     const sum = listEl.querySelector('.ep-season-summary b');
-    if (sum && epNums[current]) sum.textContent = Storage.getSeasonWatchedCount(tvId, current, epNums[current]);
+    if (sum) sum.textContent = Storage.getSeasonWatchedCount(tvId, current, releasedNums(current));
     updateMarkBtn();
     refreshTopProgress(); syncSeriesWatched();
   });
@@ -1057,14 +1290,12 @@ async function initSeriesEpisodes(overlay, movie) {
       watchedBtn.textContent = '⏳...';
       for (const s of tv.seasons) {
         if (!epNums[s.seasonNumber]) {
-          try {
-            const eps = await API.getSeasonDetails(movie.id, s.seasonNumber);
-            epCache[s.seasonNumber] = eps; epNums[s.seasonNumber] = eps.map(x => x.episodeNumber);
-          } catch {
+          const eps = await fetchSeason(s.seasonNumber);
+          if (!eps.length) {
             epNums[s.seasonNumber] = Array.from({ length: s.episodeCount }, (_, i) => i + 1);
           }
         }
-        Storage.setSeasonWatched(tvId, s.seasonNumber, epNums[s.seasonNumber], turnOn);
+        Storage.setSeasonWatched(tvId, s.seasonNumber, releasedNums(s.seasonNumber), turnOn);
       }
       Storage.setWatched(tvId, turnOn);
       if (turnOn) autoFavIfNeeded();
@@ -1078,9 +1309,101 @@ async function initSeriesEpisodes(overlay, movie) {
   refreshTopProgress();
   seasonSel.value = String(current);
   await loadSeason(current);
+
+  // Přesnou celkovou stopáž získáme až součtem jednotlivých epizod. Sezóny
+  // načítáme nejvýše po třech souběžně, aby detail zůstal rychlý a API nebylo zahlcené.
+  (async () => {
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(3, tv.seasons.length) }, async () => {
+      while (cursor < tv.seasons.length) {
+        const season = tv.seasons[cursor++];
+        await fetchSeason(season.seasonNumber);
+      }
+    });
+    await Promise.all(workers);
+    if (!document.body.contains(overlay)) return;
+    Storage.setTVReleaseMeta(tvId, tv, epCache);
+    releaseDataReady = true;
+    const totalRuntime = tv.seasons.reduce((sum, s) => sum + getSeasonRuntime(s.seasonNumber), 0);
+    const runtimeEl = overlay.querySelector('#_detail-runtime');
+    if (runtimeEl) runtimeEl.textContent = totalRuntime ? `⏱ ${formatRuntime(totalRuntime)} celkem` : '';
+    if (totalRuntime) {
+      Storage.setMediaRuntime('tv', movie.imdbId, totalRuntime);
+      syncMovieCardsRuntime(movie);
+    }
+    refreshTopProgress();
+    syncSeriesWatched();
+    renderEpisodes();
+  })().catch(() => {});
 }
 
-// ── Sync Modal ──────────────────────────────────────────────────────────────
+// ── Sync Modal + sdílený odkaz ─────────────────────────────────────────────
+function makeSyncLink(code) {
+  return `${location.href.split('#')[0]}#sync=${encodeURIComponent(code)}`;
+}
+
+function clearSyncHash() {
+  if (location.hash.startsWith('#sync=')) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+function handleSyncLinkFromUrl() {
+  if (!location.hash.startsWith('#sync=')) return;
+  let code = '';
+  try { code = decodeURIComponent(location.hash.substring(6)); } catch {}
+  const preview = code ? Storage.previewImport(code) : null;
+  if (!preview) {
+    clearSyncHash();
+    showToast('❌ Odkaz neobsahuje platnou konfiguraci');
+    return;
+  }
+
+  const rows = [
+    ['Tituly v šuplíku', preview.current.favorites, preview.incoming.favorites],
+    ['Shlédnuté tituly', preview.current.watched, preview.incoming.watched],
+    ['Shlédnuté epizody', preview.current.episodes, preview.incoming.episodes],
+    ['Hodnocení', preview.current.ratings, preview.incoming.ratings],
+    ['Poznámky', preview.current.comments, preview.incoming.comments],
+  ];
+  const overlay = showModal(`
+    <div style="padding:4px 2px 2px">
+      <p style="color:var(--text2);font-size:13px;line-height:1.55">
+        Odkaz obsahuje jinou konfiguraci Sledovátka. Porovnej ji se svými daty a vyber způsob použití.
+      </p>
+      <div class="sync-compare">
+        <div class="sync-compare__row sync-compare__row--head"><span>Obsah</span><span>Moje</span><span>Odkaz</span></div>
+        ${rows.map(([label, current, incoming]) => `<div class="sync-compare__row"><span>${label}</span><span>${current}</span><span>${incoming}</span></div>`).join('')}
+      </div>
+      <div class="sync-diff-note">
+        <strong>${preview.newTitles}</strong> nových titulů z odkazu ·
+        <strong>${preview.commonTitles}</strong> společných ·
+        <strong>${preview.keptOnlyHere}</strong> pouze u tebe
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+        <button class="btn btn--ghost" id="_sync-replace" title="Smaže místní data a použije obsah odkazu">Nahradit</button>
+        <button class="btn btn--primary" id="_sync-merge" style="justify-content:center">Doplnit</button>
+        <button class="btn btn--ghost" id="_sync-cancel" style="grid-column:1/-1;justify-content:center">Zrušit</button>
+      </div>
+      <p class="sync-link-warning">Doplnit zachová tvoje současná data a přidá nebo aktualizuje obsah z odkazu. API token se nikdy nepřenáší.</p>
+    </div>
+  `, { title: '🔗 Sdílená konfigurace', wide: true });
+
+  const finish = (mode) => {
+    const ok = Storage.importAllData(code, mode);
+    clearSyncHash();
+    if (!ok) { showToast('❌ Konfiguraci se nepodařilo načíst'); return; }
+    overlay.remove();
+    showToast(mode === 'replace' ? '✓ Konfigurace nahrazena' : '✓ Konfigurace doplněna');
+    setTimeout(() => location.reload(), 650);
+  };
+  overlay.querySelector('#_sync-replace').addEventListener('click', () => finish('replace'));
+  overlay.querySelector('#_sync-merge').addEventListener('click', () => finish('merge'));
+  overlay.querySelector('#_sync-cancel').addEventListener('click', () => { clearSyncHash(); overlay.remove(); });
+  overlay.querySelector('.modal-close')?.addEventListener('click', clearSyncHash, { capture: true });
+  overlay.addEventListener('click', e => { if (e.target === overlay) clearSyncHash(); });
+}
+
 function showSyncModal() {
   const overlay = showModal(`
     <div style="padding:12px 20px 4px">
@@ -1091,16 +1414,19 @@ function showSyncModal() {
 
       <div id="_sync-export">
         <p style="color:var(--text2);font-size:13px;margin-bottom:14px;line-height:1.5">
-          Vygeneruj kód na <strong>tomto zařízení</strong> a vlož ho na druhém.
-          Kód obsahuje šuplík, hodnocení, komentáře a kolekce (ne API token).
+          Nejjednodušší je poslat odkaz. Na druhém zařízení se nejdřív zobrazí porovnání a volby
+          <strong>Nahradit / Doplnit / Zrušit</strong>. API token se nepřenáší.
         </p>
-        <button class="btn btn--primary" id="_gen-code" style="width:100%;justify-content:center;margin-bottom:14px">🔄 Vygenerovat kód</button>
+        <button class="btn btn--primary" id="_gen-code" style="width:100%;justify-content:center;margin-bottom:14px">🔗 Vygenerovat odkaz</button>
         <div id="_export-result" style="display:none;margin-top:14px">
+          <input id="_export-link" readonly aria-label="Odkaz pro synchronizaci" style="width:100%;font-size:11px;margin-bottom:8px">
           <textarea id="_export-code" readonly style="width:100%;height:90px;font-size:11px;font-family:monospace;word-break:break-all;resize:none;border-radius:8px;padding:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text)"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn--primary btn--sm" id="_copy-code" style="flex:1">📋 Kopírovat</button>
-            <button class="btn btn--ghost btn--sm" id="_show-qr" style="flex:1">📱 QR kód</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <button class="btn btn--primary btn--sm" id="_copy-link" style="justify-content:center">🔗 Kopírovat odkaz</button>
+            <button class="btn btn--ghost btn--sm" id="_show-qr" style="justify-content:center">📱 QR kód</button>
+            <button class="btn btn--ghost btn--sm" id="_copy-code" style="grid-column:1/-1;justify-content:center">📋 Kopírovat původní kód</button>
           </div>
+          <p id="_link-size-note" class="sync-link-warning"></p>
           <canvas id="_qr-canvas" style="display:none;margin:12px auto 0;border-radius:8px;background:#fff;padding:10px;max-width:200px;width:100%"></canvas>
           <p id="_qr-note" style="display:none;font-size:11px;color:var(--text3);text-align:center;margin-top:6px">Namiř kamerou mobilu na QR kód</p>
         </div>
@@ -1141,15 +1467,29 @@ function showSyncModal() {
   // Export
   overlay.querySelector('#_gen-code').addEventListener('click', () => {
     const code = Storage.exportAllData();
+    const link = makeSyncLink(code);
     const result = overlay.querySelector('#_export-result');
     overlay.querySelector('#_export-code').value = code;
+    overlay.querySelector('#_export-link').value = link;
+    overlay.querySelector('#_link-size-note').textContent = link.length > 30000
+      ? 'Konfigurace je velmi velká. Některé chatovací aplikace mohou dlouhý odkaz zkrátit; v tom případě použij původní kód.'
+      : 'Odkaz obsahuje tvůj šuplík, průběh, hodnocení a poznámky. Posílej ho jen lidem, kterým tato data chceš předat.';
     result.style.display = '';
     // Save last export timestamp
     localStorage.setItem('wm_last_export', new Date().toISOString());
   });
 
+  overlay.querySelector('#_copy-link').addEventListener('click', () => {
+    const link = overlay.querySelector('#_export-link').value;
+    navigator.clipboard?.writeText(link).then(() => showToast('🔗 Odkaz zkopírován!')).catch(() => {
+      overlay.querySelector('#_export-link').select();
+      document.execCommand('copy');
+      showToast('🔗 Odkaz zkopírován!');
+    });
+  });
+
   overlay.querySelector('#_copy-code').addEventListener('click', () => {
-    const code = overlay.querySelector('#_export-code').value;
+    const code = overlay.querySelector('#_export-link').value;
     navigator.clipboard?.writeText(code).then(() => showToast('📋 Kód zkopírován!')).catch(() => {
       overlay.querySelector('#_export-code').select();
       document.execCommand('copy');
@@ -1185,7 +1525,7 @@ function showSyncModal() {
     const code = overlay.querySelector('#_import-code').value.trim();
     const status = overlay.querySelector('#_import-status');
     if (!code) { status.style.display = ''; status.textContent = '⚠️ Vlož kód nejdřív.'; return; }
-    const ok = Storage.importAllData(code);
+    const ok = Storage.importAllData(code, 'merge');
     status.style.display = '';
     if (ok) {
       status.innerHTML = '✅ Data úspěšně importována! <br><small style="color:var(--text3)">Stránka se za 2s obnoví.</small>';

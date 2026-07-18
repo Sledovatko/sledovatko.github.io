@@ -16,6 +16,8 @@ const Storage = (() => {
     COLLAPSED: 'wm_collapsed',
     TOKEN: 'wm_api_token',
     EPISODES: 'wm_watched_episodes',
+    TV_META: 'wm_tv_meta',
+    MEDIA_META: 'wm_media_meta',
   };
 
   const epCode = (s, e) => `s${s}e${e}`;
@@ -126,6 +128,67 @@ const Storage = (() => {
       return this.getWatchedEpisodes(tvId).size;
     },
 
+    // Metadata běžných sezón umožňují zobrazit průběh seriálu i mimo detail.
+    // Speciály (sezóna 0) se sem nikdy neukládají.
+    setTVMeta(tvId, tv) {
+      const all = get(K.TV_META, {});
+      const seasons = (tv?.seasons || [])
+        .filter(s => Number(s.seasonNumber) > 0 && Number(s.episodeCount) > 0)
+        .map(s => ({ seasonNumber: Number(s.seasonNumber), episodeCount: Number(s.episodeCount) }));
+      all[tvId] = {
+        totalEpisodes: seasons.reduce((sum, s) => sum + s.episodeCount, 0),
+        seasons,
+        updatedAt: Date.now(),
+      };
+      set(K.TV_META, all);
+    },
+    getTVMeta(tvId) { return get(K.TV_META, {})[tvId] || null; },
+    getTVProgress(tvId) {
+      const meta = this.getTVMeta(tvId);
+      if (!meta?.seasons?.length || !meta.totalEpisodes) return null;
+      const watched = meta.seasons.reduce((sum, s) => {
+        const nums = Array.isArray(s.releasedEpisodeNumbers)
+          ? s.releasedEpisodeNumbers
+          : Array.from({ length: s.episodeCount }, (_, i) => i + 1);
+        return sum + this.getSeasonWatchedCount(tvId, s.seasonNumber, nums);
+      }, 0);
+      const releasedTotal = meta.seasons.reduce((sum, s) => sum + (
+        Array.isArray(s.releasedEpisodeNumbers) ? s.releasedEpisodeNumbers.length : s.episodeCount
+      ), 0);
+      if (!releasedTotal) return null;
+      return {
+        watched: Math.min(watched, releasedTotal),
+        total: releasedTotal,
+        percent: Math.min(100, Math.round(watched / releasedTotal * 100)),
+      };
+    },
+    setTVReleaseMeta(tvId, tv, episodeMap) {
+      const all = get(K.TV_META, {});
+      const seasons = (tv?.seasons || []).filter(s => Number(s.seasonNumber) > 0).map(s => ({
+        seasonNumber: Number(s.seasonNumber),
+        episodeCount: Number(s.episodeCount) || 0,
+        releasedEpisodeNumbers: (episodeMap[s.seasonNumber] || [])
+          .filter(ep => ep.isReleased)
+          .map(ep => ep.episodeNumber),
+      }));
+      all[tvId] = {
+        totalEpisodes: seasons.reduce((sum, s) => sum + s.episodeCount, 0),
+        releasedEpisodes: seasons.reduce((sum, s) => sum + s.releasedEpisodeNumbers.length, 0),
+        seasons,
+        updatedAt: Date.now(),
+      };
+      set(K.TV_META, all);
+    },
+    setMediaRuntime(mediaType, id, minutes) {
+      if (!minutes) return;
+      const all = get(K.MEDIA_META, {});
+      all[`${mediaType}:${id}`] = { runtime: Math.round(minutes), updatedAt: Date.now() };
+      set(K.MEDIA_META, all);
+    },
+    getMediaRuntime(mediaType, id) {
+      return get(K.MEDIA_META, {})[`${mediaType}:${id}`]?.runtime || 0;
+    },
+
     // ── Hodnocení ─────────────────────────────────────────────────────────────
     getRating(imdbId) { return get(K.RATINGS, {})[imdbId] || null; },
     setRating(imdbId, rating) {
@@ -212,7 +275,7 @@ const Storage = (() => {
     exportAllData() {
       // Export all keys except API token
       const exportKeys = [K.FAVORITES, K.WATCHED, K.RATINGS, K.COMMENTS,
-                          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES];
+                          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES, K.TV_META, K.MEDIA_META];
       const data = { _v: 1, _t: Date.now() };
       for (const k of exportKeys) {
         const v = localStorage.getItem(k);
@@ -224,17 +287,52 @@ const Storage = (() => {
       return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
     },
 
-    importAllData(code) {
+    previewImport(code) {
+      try {
+        const json = decodeURIComponent(escape(atob(code.trim())));
+        const data = JSON.parse(json);
+        if (!data || data._v !== 1) return null;
+        const parseIncoming = (key, fallback) => {
+          try { return data[key] ? JSON.parse(data[key]) : fallback; } catch { return fallback; }
+        };
+        const incomingFavs = parseIncoming(K.FAVORITES, []);
+        const currentFavs = get(K.FAVORITES, []);
+        const incomingIds = new Set(incomingFavs.map(m => m.imdbId));
+        const currentIds = new Set(currentFavs.map(m => m.imdbId));
+        const summarize = (source) => ({
+          favorites: (source(K.FAVORITES, []) || []).length,
+          watched: (source(K.WATCHED, []) || []).length,
+          episodes: Object.values(source(K.EPISODES, {}) || {}).reduce((n, eps) => n + (eps?.length || 0), 0),
+          ratings: Object.keys(source(K.RATINGS, {}) || {}).length,
+          comments: Object.keys(source(K.COMMENTS, {}) || {}).length,
+        });
+        return {
+          current: summarize((key, fallback) => get(key, fallback)),
+          incoming: summarize(parseIncoming),
+          newTitles: incomingFavs.filter(m => !currentIds.has(m.imdbId)).length,
+          commonTitles: incomingFavs.filter(m => currentIds.has(m.imdbId)).length,
+          keptOnlyHere: currentFavs.filter(m => !incomingIds.has(m.imdbId)).length,
+          createdAt: data._t || null,
+        };
+      } catch { return null; }
+    },
+
+    importAllData(code, mode = 'merge') {
       try {
         const json = decodeURIComponent(escape(atob(code.trim())));
         const data = JSON.parse(json);
         if (!data || data._v !== 1) return false;
         const safeKeys = new Set([
           K.FAVORITES, K.WATCHED, K.RATINGS, K.COMMENTS,
-          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES, 'wm_custom_labels',
+          K.LABELS, K.ORDER, K.SAVED_SEARCHES, K.EPISODES, K.TV_META, K.MEDIA_META, 'wm_custom_labels',
         ]);
+        if (mode === 'replace') safeKeys.forEach(k => localStorage.removeItem(k));
         for (const [k, v] of Object.entries(data)) {
           if (!safeKeys.has(k)) continue; // skip _v, _t, token etc.
+          if (mode === 'replace') {
+            localStorage.setItem(k, v);
+            continue;
+          }
           // Merge arrays/objects instead of overwrite where possible
           try {
             const incoming = JSON.parse(v);

@@ -7,6 +7,30 @@ const API = (() => {
   const IMG_BASE = 'https://image.tmdb.org/t/p';
   let _token = '';
   let _genreCache = null;
+  const CACHE_KEY = 'wm_api_cache_v1';
+  const cacheTTL = path => {
+    if (/\/movie\/\d+\?language=/.test(path)) return 30 * 86400000;
+    if (/\/tv\/\d+\/season\/\d+\?/.test(path)) return 12 * 3600000;
+    if (/\/tv\/\d+\?language=/.test(path)) return 12 * 3600000;
+    if (/\/(images|videos)/.test(path)) return 3 * 86400000;
+    return 0;
+  };
+  const readCache = (path, ttl) => {
+    if (!ttl) return null;
+    try {
+      const hit = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')[path];
+      return hit && Date.now() - hit.time < ttl ? hit.data : null;
+    } catch { return null; }
+  };
+  const writeCache = (path, data, ttl) => {
+    if (!ttl) return;
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+      cache[path] = { time: Date.now(), data };
+      const newest = Object.entries(cache).sort((a,b) => b[1].time - a[1].time).slice(0,80);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(newest)));
+    } catch {}
+  };
 
   const headers = () => ({
     'Authorization': `Bearer ${_token}`,
@@ -14,9 +38,14 @@ const API = (() => {
   });
 
   const get = async (path) => {
+    const ttl = cacheTTL(path);
+    const cached = readCache(path, ttl);
+    if (cached) return cached;
     const res = await fetch(`${BASE}${path}`, { headers: headers() });
     if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
-    return res.json();
+    const data = await res.json();
+    writeCache(path, data, ttl);
+    return data;
   };
 
   const poster = (path, size = 'w342') => path ? `${IMG_BASE}/${size}${path}` : '';
@@ -134,11 +163,13 @@ const API = (() => {
     },
 
     // Smart similar: merge recommendations + similar, filter by shared genres, deduplicate
-    async getSmartSimilar(movieId, sourceGenreIds = []) {
+    async getSmartSimilar(movieId, sourceGenreIds = [], mediaType = 'movie') {
+      const endpointType = mediaType === 'tv' ? 'tv' : 'movie';
       const [recs, sim] = await Promise.all([
-        fetchPage(`/movie/${movieId}/recommendations`, 1).catch(() => []),
-        fetchPage(`/movie/${movieId}/similar`, 1).catch(() => []),
+        fetchPage(`/${endpointType}/${movieId}/recommendations`, 1).catch(() => []),
+        fetchPage(`/${endpointType}/${movieId}/similar`, 1).catch(() => []),
       ]);
+      if (endpointType === 'tv') [...recs, ...sim].forEach(m => { m.mediaType = 'tv'; });
       // Merge, recommendations first (higher quality)
       const seen = new Set();
       const merged = [];
@@ -175,13 +206,39 @@ const API = (() => {
       return (data.results || []).filter(v => v.site === 'YouTube' || v.site === 'Vimeo');
     },
 
+    async getMovieDetails(movieId) {
+      const data = await get(`/movie/${movieId}?language=cs-CZ`);
+      return { runtime: data.runtime || 0 };
+    },
+
+    // TV a filmy mohou mít stejné číselné ID. Proto se pro seriály musí vždy
+    // používat endpoint /tv/*; jinak se např. u Futuramy načtou obrázky cizího filmu.
+    async getTVImages(tvId) {
+      const data = await get(`/tv/${tvId}/images`);
+      const backdrops = (data.backdrops || [])
+        .filter(b => !b.iso_639_1 || b.iso_639_1 === 'en' || b.iso_639_1 === 'xx')
+        .sort((a, b) => b.vote_average - a.vote_average);
+      const seen = new Set();
+      const unique = [];
+      for (const b of backdrops) {
+        const key = b.file_path || `${b.width}_${b.height}`;
+        if (!seen.has(key)) { seen.add(key); unique.push(b); }
+      }
+      return unique.slice(0, 10).map(b => backdrop(b.file_path));
+    },
+
+    async getTVVideos(tvId) {
+      const data = await get(`/tv/${tvId}/videos?language=en-US`);
+      return (data.results || []).filter(v => v.site === 'YouTube' || v.site === 'Vimeo');
+    },
+
     // ── Seriály: sezóny a epizody ─────────────────────────────────────────────
-    // Detail seriálu se seznamem sezón (přeskakuje "Speciály" = season_number 0,
-    // pokud nemají epizody). Vrací jen sezóny s alespoň jednou epizodou.
+    // Detail seriálu se seznamem běžných sezón. "Speciály" (season_number 0)
+    // se záměrně nikdy nepočítají do stavu shlédnutí celého seriálu.
     async getTVDetails(tvId) {
       const data = await get(`/tv/${tvId}?language=cs-CZ`);
       const seasons = (data.seasons || [])
-        .filter(s => (s.episode_count || 0) > 0)
+        .filter(s => s.season_number > 0 && (s.episode_count || 0) > 0)
         .map(s => ({
           seasonNumber: s.season_number,
           name: s.name || `Sezóna ${s.season_number}`,
@@ -195,6 +252,7 @@ const API = (() => {
         name: data.name || data.original_name || '',
         numberOfSeasons: data.number_of_seasons || seasons.length,
         numberOfEpisodes: data.number_of_episodes || 0,
+        episodeRunTime: data.episode_run_time || [],
         status: data.status || '',
         seasons,
       };
@@ -215,6 +273,7 @@ const API = (() => {
           airDate: e.air_date || '',
           rating: votes >= 3 ? (e.vote_average || 0) : 0,
           runtime: e.runtime || 0,
+          isReleased: !!e.air_date && new Date(`${e.air_date}T23:59:59`) <= new Date(),
         };
       });
     },
