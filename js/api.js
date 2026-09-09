@@ -6,14 +6,15 @@ const API = (() => {
   const BASE = 'https://api.themoviedb.org/3';
   const IMG_BASE = 'https://image.tmdb.org/t/p';
   let _token = '';
-  let _genreCache = null;
+  const _genreCache = {};
+  const memoryCache = new Map();
   const CACHE_KEY = 'wm_api_cache_v1';
   const cacheTTL = path => {
     if (/\/movie\/\d+\?language=/.test(path)) return 30 * 86400000;
     if (/\/tv\/\d+\/season\/\d+\?/.test(path)) return 12 * 3600000;
     if (/\/tv\/\d+\?language=/.test(path)) return 12 * 3600000;
     if (/\/(images|videos)/.test(path)) return 3 * 86400000;
-    return 0;
+    return 5 * 60000;
   };
   const readCache = (path, ttl) => {
     if (!ttl) return null;
@@ -37,15 +38,27 @@ const API = (() => {
     'Content-Type': 'application/json',
   });
 
-  const get = async (path) => {
+  const get = async (path, { signal } = {}) => {
     const ttl = cacheTTL(path);
+    const hit = memoryCache.get(path);
+    if (hit && Date.now() - hit.time < ttl) return hit.data;
     const cached = readCache(path, ttl);
     if (cached) return cached;
-    const res = await fetch(`${BASE}${path}`, { headers: headers() });
-    if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
-    const data = await res.json();
-    writeCache(path, data, ttl);
-    return data;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, 18000);
+    try {
+      const res = await fetch(BASE + path, { headers: headers(), signal: controller.signal });
+      if (!res.ok) throw new Error('API ' + res.status);
+      const data = await res.json();
+      memoryCache.set(path, {time: Date.now(), data});
+      if (memoryCache.size > 150) memoryCache.delete(memoryCache.keys().next().value);
+      // Persist only detail metadata; lists/search stay in the short-lived memory cache.
+      if (/^\/(movie|tv)\/\d+/.test(path)) writeCache(path, data, ttl);
+      return data;
+    } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
   };
 
   const poster = (path, size = 'w342') => path ? `${IMG_BASE}/${size}${path}` : '';
@@ -60,7 +73,7 @@ const API = (() => {
       title: j.title || j.name || 'Neznámý název',
       originalTitle: j.original_title || j.original_name || j.title || j.name || '',
       year: release.length >= 4 ? release.substring(0, 4) : '',
-      imdbId: String(j.id),
+      imdbId: mediaType === 'tv' ? 'tv:' + j.id : String(j.id),
       posterUrl: poster(j.poster_path),
       backdropUrl: backdrop(j.backdrop_path),
       rating: votes >= 10 ? (j.vote_average || 0) : 0,
@@ -74,28 +87,15 @@ const API = (() => {
 
   const fetchPage = async (endpoint, page = 1) => {
     const sep = endpoint.includes('?') ? '&' : '?';
-    const [csData, skData, enData] = await Promise.all([
-      get(`${endpoint}${sep}language=cs-CZ&page=${page}`).catch(() => ({results:[]})),
-      get(`${endpoint}${sep}language=sk-SK&page=${page}`).catch(() => ({results:[]})),
-      get(`${endpoint}${sep}language=en-US&page=${page}`).catch(() => ({results:[]})),
-    ]);
-    let results = (csData.results || []).map(j => parseMovie(j));
-    [skData, enData].forEach(fb => {
-      const fbMap = new Map((fb.results || []).map(j => [j.id, j]));
-      for (const m of results) {
-        if (!m.overview) {
-          const fbMovie = fbMap.get(Number(m.imdbId));
-          if (fbMovie?.overview) m.overview = fbMovie.overview;
-        }
-      }
-    });
-    return results;
+    const data = await get(endpoint + sep + 'language=cs-CZ&page=' + page);
+    const type = /^(\/tv\/|\/discover\/tv|\/trending\/tv)/.test(endpoint) ? 'tv' : 'movie';
+    return (data.results || []).map(j => parseMovie(j, type));
   };
 
   const fetchMultiPage = async (endpoint, pages = 3) => {
     const promises = Array.from({ length: pages }, (_, i) => fetchPage(endpoint, i + 1));
     const results = await Promise.all(promises);
-    return results.flat();
+    return [...new Map(results.flat().map(m => [m.imdbId, m])).values()];
   };
 
   return {
@@ -104,9 +104,9 @@ const API = (() => {
 
     poster, backdrop, still,
 
-    async getPopular()    { return fetchMultiPage('/movie/popular', 3); },
-    async getNowPlaying() { return fetchMultiPage('/movie/now_playing', 3); },
-    async getTopRated()   { return fetchMultiPage('/movie/top_rated', 3); },
+    async getPopular()    { return fetchMultiPage('/movie/popular', 1); },
+    async getNowPlaying() { return fetchMultiPage('/movie/now_playing?region=CZ', 1); },
+    async getTopRated()   { return fetchMultiPage('/movie/top_rated', 1); },
     async getUpcoming() {
       const today = new Date().toISOString().substring(0, 10);
       const future = new Date(); future.setMonth(future.getMonth() + 8);
@@ -134,15 +134,20 @@ const API = (() => {
       return parseMovie(results[seed % results.length]);
     },
 
-    async getGenres() {
-      if (_genreCache) return _genreCache;
-      const data = await get('/genre/movie/list?language=cs-CZ');
-      _genreCache = data.genres || [];
-      return _genreCache;
+    async getGenres(type = 'movie') {
+      if (_genreCache[type]) return _genreCache[type];
+      const data = await get('/genre/' + type + '/list?language=cs-CZ');
+      return _genreCache[type] = data.genres || [];
     },
 
-    async getByGenre(genreId, pages = 3) {
-      return fetchMultiPage(`/discover/movie?with_genres=${genreId}&sort_by=popularity.desc`, pages);
+    async getByGenre(genreId, pages = 1, mediaType = 'movie') {
+      return fetchMultiPage('/discover/' + mediaType + '?with_genres=' + genreId + '&sort_by=popularity.desc', pages);
+    },
+
+    async getOverview(id, type = 'movie') {
+      let data = await get('/' + type + '/' + id + '?language=cs-CZ');
+      if (!data.overview) data = await get('/' + type + '/' + id + '?language=en-US');
+      return data.overview || '';
     },
 
     async getByDecade(decade) {
@@ -206,8 +211,8 @@ const API = (() => {
       return (data.results || []).filter(v => v.site === 'YouTube' || v.site === 'Vimeo');
     },
 
-    async getMovieDetails(movieId) {
-      const data = await get(`/movie/${movieId}?language=cs-CZ`);
+    async getMovieDetails(movieId, options = {}) {
+      const data = await get(`/movie/${movieId}?language=cs-CZ`, options);
       return { runtime: data.runtime || 0 };
     },
 
@@ -235,8 +240,8 @@ const API = (() => {
     // ── Seriály: sezóny a epizody ─────────────────────────────────────────────
     // Detail seriálu se seznamem běžných sezón. "Speciály" (season_number 0)
     // se záměrně nikdy nepočítají do stavu shlédnutí celého seriálu.
-    async getTVDetails(tvId) {
-      const data = await get(`/tv/${tvId}?language=cs-CZ`);
+    async getTVDetails(tvId, options = {}) {
+      const data = await get(`/tv/${tvId}?language=cs-CZ`, options);
       const seasons = (data.seasons || [])
         .filter(s => s.season_number > 0 && (s.episode_count || 0) > 0)
         .map(s => ({
@@ -253,6 +258,7 @@ const API = (() => {
         numberOfSeasons: data.number_of_seasons || seasons.length,
         numberOfEpisodes: data.number_of_episodes || 0,
         episodeRunTime: data.episode_run_time || [],
+        lastEpisodeRuntime: data.last_episode_to_air?.runtime || 0,
         status: data.status || '',
         seasons,
       };
@@ -278,54 +284,43 @@ const API = (() => {
       });
     },
 
-    async searchMovies(query, { yearFrom, yearTo, genreId, minRating, searchTV = false, page = 1 } = {}) {
-      if (!query.trim()) {
-        // Discover mode — fetch multiple pages for filter-only searches
-        const type = searchTV ? 'tv' : 'movie';
-        let ep = `/discover/${type}?sort_by=popularity.desc`;
-        if (genreId)   ep += `&with_genres=${genreId}`;
-        if (yearFrom)  ep += `&primary_release_date.gte=${yearFrom}-01-01`;
-        if (yearTo)    ep += `&primary_release_date.lte=${yearTo}-12-31`;
-        if (minRating) ep += `&vote_average.gte=${minRating}&vote_count.gte=50`;
-        const results = await fetchPage(ep, page);
-        if (searchTV) results.forEach(r => { r.mediaType = 'tv'; });
-        return results;
-      }
+    // One request per media type and page, with accurate pagination and cancellation.
+    async searchPage(query, { yearFrom, yearTo, genreId, minRating, searchTV = false, page = 1, signal, maxRuntime, noHorror } = {}) {
       const type = searchTV ? 'tv' : 'movie';
-      const [csData, skData, enData] = await Promise.all([
-        get(`/search/${type}?query=${encodeURIComponent(query)}&language=cs-CZ&page=${page}`).catch(() => ({results:[]})),
-        get(`/search/${type}?query=${encodeURIComponent(query)}&language=sk-SK&page=${page}`).catch(() => ({results:[]})),
-        get(`/search/${type}?query=${encodeURIComponent(query)}&language=en-US&page=${page}`).catch(() => ({results:[]})),
-      ]);
-      let results = (csData.results || []).map(j => parseMovie(j, type));
-      [skData, enData].forEach(fb => {
-        const fbMap = new Map((fb.results || []).map(j => [j.id, j]));
-        for (const m of results) {
-          if (!m.overview) {
-            const fbMovie = fbMap.get(Number(m.imdbId));
-            if (fbMovie?.overview) m.overview = fbMovie.overview;
-          }
-        }
-      });
-      if (yearFrom)  results = results.filter(m => parseInt(m.year) >= yearFrom);
-      if (yearTo)    results = results.filter(m => parseInt(m.year) <= yearTo);
-      if (minRating) results = results.filter(m => m.rating >= minRating);
-      if (genreId)   results = results.filter(m => m.genreIds.includes(genreId));
-      return results;
+      const params = new URLSearchParams({ language: 'cs-CZ', page: String(page), include_adult: 'false' });
+      const searching = !!query.trim();
+      if (searching) params.set('query', query.trim());
+      else {
+        params.set('sort_by', 'popularity.desc');
+        const date = searchTV ? 'first_air_date' : 'primary_release_date';
+        if (yearFrom) params.set(date + '.gte', yearFrom + '-01-01');
+        if (yearTo) params.set(date + '.lte', yearTo + '-12-31');
+        if (genreId) params.set('with_genres', genreId);
+        if (minRating) {params.set('vote_average.gte', minRating);params.set('vote_count.gte', 50);}
+        if (maxRuntime) params.set('with_runtime.lte', maxRuntime);
+        if (noHorror) params.set('without_genres', 27);
+      }
+      const data = await get('/' + (searching ? 'search/' : 'discover/') + type + '?' + params, { signal });
+      let items = (data.results || []).map(j => parseMovie(j, type));
+      if (searching) items = items.filter(m => (!yearFrom || +m.year >= yearFrom) && (!yearTo || +m.year <= yearTo) && (!minRating || m.rating >= minRating) && (!genreId || m.genreIds.includes(+genreId)));
+      return {items, page, totalPages: Math.min(500, data.total_pages || 0), totalResults: data.total_results || 0};
     },
+    async searchMovies(query, options = {}) { return (await this.searchPage(query, options)).items; },
 
     async getBoredMovies({ genreId, decade } = {}) {
       let ep = '/discover/movie?sort_by=popularity.desc';
       if (genreId) ep += `&with_genres=${genreId}`;
       if (decade)  ep += `&primary_release_date.gte=${decade}-01-01&primary_release_date.lte=${parseInt(decade)+9}-12-31`;
 
-      const allPages = Array.from({ length: 500 }, (_, i) => i + 1);
+      const first = await get(ep + '&language=cs-CZ&page=1');
+      const count = Math.min(500, Math.max(1, first.total_pages || 1));
+      const allPages = Array.from({ length: count - 1 }, (_, i) => i + 2);
       // Shuffle
       for (let i = allPages.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [allPages[i], allPages[j]] = [allPages[j], allPages[i]];
       }
-      const selected = allPages.slice(0, 80); // FIX #26: more movies
+      const selected = [1, ...allPages.slice(0, 11)];
       const all = [];
       for (let i = 0; i < selected.length; i += 10) {
         const batch = selected.slice(i, i + 10);
@@ -341,17 +336,18 @@ const API = (() => {
       return withPoster;
     },
 
-    async getKinoVecer(sourceMovies) {
+    async getKinoVecer(sourceMovies, savedOnly = false) {
+      sourceMovies = sourceMovies.filter(m => m.mediaType !== 'tv');
       if (!sourceMovies.length) return null;
       const seed = sourceMovies[Math.floor(Math.random() * sourceMovies.length)];
-      const similar = await this.getSimilar(seed.id);
+      const similar = savedOnly ? [] : await this.getSimilar(seed.id);
       const genres = await this.getGenres();
       const genreMap = Object.fromEntries(genres.map(g => [g.id, g.name]));
       const seedGenres = new Set(seed.genreIds);
 
       const pool = new Map([[seed.imdbId, seed]]);
       for (const m of similar) {
-        if (m.posterUrl && m.genreIds.some(g => seedGenres.has(g))) pool.set(m.imdbId, m);
+        if (m.posterUrl && (savedOnly || m.genreIds.some(g => seedGenres.has(g)))) pool.set(m.imdbId, m);
       }
       for (const m of sourceMovies) {
         if (m.posterUrl && m.genreIds.some(g => seedGenres.has(g))) pool.set(m.imdbId, m);
