@@ -26,7 +26,14 @@ const Storage = (() => {
     try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; }
     catch { return def; }
   };
-  const set = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
+  const set = (key, val) => {
+    try {
+      if(typeof Account!=='undefined' && !Account.canEdit() && ![K.MEDIA_META,K.TV_META,K.THEME,K.HISTORY,K.COLLAPSED].includes(key))throw Error('Účet není připraven k úpravám');
+      localStorage.setItem(key, JSON.stringify(val));
+      if(![K.MEDIA_META,K.TV_META,K.THEME,K.HISTORY,K.COLLAPSED].includes(key) && typeof document!=='undefined') document.dispatchEvent(new CustomEvent('librarychange'));
+    }
+    catch(error) { if(typeof showToast==='function')showToast('Změnu se nepodařilo uložit. Zkontroluj volné místo a možnost ukládání v prohlížeči.'); throw error; }
+  };
 
   return {
     // ── Token ────────────────────────────────────────────────────────────────
@@ -182,11 +189,11 @@ const Storage = (() => {
     setMediaRuntime(mediaType, id, minutes) {
       if (!minutes) return;
       const all = get(K.MEDIA_META, {});
-      all[`${mediaType}:${id}`] = { runtime: Math.round(minutes), updatedAt: Date.now() };
+      all[`${mediaType}:${String(id).replace(/^tv:/,'')}`] = { runtime: Math.round(minutes), updatedAt: Date.now() };
       set(K.MEDIA_META, all);
     },
     getMediaRuntime(mediaType, id) {
-      return get(K.MEDIA_META, {})[`${mediaType}:${id}`]?.runtime || 0;
+      return get(K.MEDIA_META, {})[`${mediaType}:${String(id).replace(/^tv:/,'')}`]?.runtime || 0;
     },
 
     // ── Hodnocení ─────────────────────────────────────────────────────────────
@@ -378,14 +385,18 @@ function getCustomLabelDefs() {
   try { return JSON.parse(localStorage.getItem('wm_custom_labels') || '{}'); } catch { return {}; }
 }
 function saveCustomLabelDef(key, color, name, emoji = '🏷️') {
+  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const defs = getCustomLabelDefs();
   defs[key] = { color, name, emoji };
   localStorage.setItem('wm_custom_labels', JSON.stringify(defs));
+  document.dispatchEvent(new CustomEvent('librarychange'));
 }
 function deleteCustomLabelDef(key) {
+  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const defs = getCustomLabelDefs();
   delete defs[key];
   localStorage.setItem('wm_custom_labels', JSON.stringify(defs));
+  document.dispatchEvent(new CustomEvent('librarychange'));
 }
 
 // Hide label (works for both predefined and custom — marks as hidden, does NOT wipe film assignments)
@@ -393,12 +404,12 @@ function getHiddenLabelKeys() {
   try { return new Set(JSON.parse(localStorage.getItem('wm_hidden_labels') || '[]')); } catch { return new Set(); }
 }
 function hideLabel(key) {
+  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const hidden = getHiddenLabelKeys();
   hidden.add(key);
   localStorage.setItem('wm_hidden_labels', JSON.stringify([...hidden]));
-  // If it was a custom label, also remove its definition
-  const defs = getCustomLabelDefs();
-  if (defs[key]) { delete defs[key]; localStorage.setItem('wm_custom_labels', JSON.stringify(defs)); }
+  document.dispatchEvent(new CustomEvent('librarychange'));
+  // Keep definitions and assignments so hiding a label remains reversible.
 }
 function getAllLabelDefs() {
   const custom = getCustomLabelDefs();
@@ -407,7 +418,8 @@ function getAllLabelDefs() {
     const em = v.emoji || '🏷️';
     all[k] = { color: v.color, emoji: em, label: `${em} ${v.name}` };
   }
-  return all;
+  const hidden = getHiddenLabelKeys();
+  return Object.fromEntries(Object.entries(all).filter(([key]) => !hidden.has(key)));
 }
 
 function movieCountLabel(n) {

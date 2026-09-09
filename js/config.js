@@ -1,0 +1,2 @@
+// TMDB read-only application credential. Never included in user-data exports.
+window.SLEDOVATKO_CONFIG = { tmdbToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzdiYTNiOTY2OGM2NTMzZjFhNzU3MTEzYWQ4MWQwMyIsIm5iZiI6MTc3MzkwNjMzNS40ODE5OTk5LCJzdWIiOiI2OWJiYTk5ZmRkMGUwMDM2MTMwNTI2ZDMiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.yCoClpY_j6h_wmrkxoBzQ3v4FxgZ8JOmzwHwXXS1ryw' };

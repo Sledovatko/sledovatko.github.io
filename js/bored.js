@@ -26,7 +26,7 @@ class BoredGrid {
     this.CENTER_SCALE = 4.8;   // max zoom on center tile
     this.ZOOM_POWER   = 2.0;   // steep — center large, quick dropoff
     this.MIN_SCALE    = 1.0;
-    this.EASING       = 0.11;
+    this.EASING       = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 1 : 0.11;
 
     // Opacity — whole canvas dims, mouse lights up area around it
     this.OP_HOT  = 1.0;
@@ -51,7 +51,7 @@ class BoredGrid {
     this.canvas.removeEventListener('touchstart', this._onTouchStart);
     this.canvas.removeEventListener('touchmove', this._onTouchMove);
     this.canvas.removeEventListener('touchend', this._onTouchEnd);
-    this.canvas.removeEventListener('touchcancel', this._onTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this._onTouchCancel);
     window.removeEventListener('resize', this._onResize);
   }
 
@@ -90,7 +90,8 @@ class BoredGrid {
     this._onClick  = e => this._handleClick(e);
     this._onTouchStart = e => { e.preventDefault(); this._syncTouch(e); };
     this._onTouchMove  = e => { e.preventDefault(); this._syncTouch(e); };
-    this._onTouchEnd   = e => { this._handleClick({ clientX: this.mouse.x, clientY: this.mouse.y }); this._handleLeave(); };
+    this._onTouchEnd   = e => { const touch = e.changedTouches?.[0]; if (touch) this._handleClick(touch); this._handleLeave(); };
+    this._onTouchCancel = () => this._handleLeave();
     this._onResize = () => this._setupGrid();
     this.canvas.addEventListener('mousemove',  this._onMove,  { passive: true });
     this.canvas.addEventListener('mouseleave', this._onLeave, { passive: true });
@@ -98,7 +99,7 @@ class BoredGrid {
     this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: false });
     this.canvas.addEventListener('touchmove',  this._onTouchMove,  { passive: false });
     this.canvas.addEventListener('touchend',   this._onTouchEnd);
-    this.canvas.addEventListener('touchcancel', this._onTouchEnd);
+    this.canvas.addEventListener('touchcancel', this._onTouchCancel);
     window.addEventListener('resize', this._onResize);
   }
 
