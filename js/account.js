@@ -10,7 +10,7 @@ function createAccount(deps = {}) {
   let generation = 0, timer = null, busy = null, suspended = false, initialized = false;
   let localRevision = 0, dirty = false, edits = 0, remoteConflict = null;
   let client = deps.client || null;
-  const state = { configured: false, user: null, status: 'guest', message: '', ready: false, recovery: false, googleEnabled: false, githubEnabled: false, emailEnabled: true, manualLinkingEnabled: false };
+  const state = { configured: false, user: null, status: 'guest', message: '', ready: false, recovery: false, googleEnabled: false, emailEnabled: true, manualLinkingEnabled: false };
   const read = key => { try { return JSON.parse(disk.getItem(key) || 'null'); } catch { return null; } };
   const write = (key, value) => disk.setItem(key, JSON.stringify(value));
   const normalize = snapshot => data.mergeCloudSnapshots(snapshot, data.emptyCloudSnapshot());
@@ -246,7 +246,7 @@ function createAccount(deps = {}) {
     disk.removeItem(CACHE); disk.removeItem('wm_sync_rollback');
   }
   async function signInOAuth(provider) {
-    if (!state.configured || !client || !['google', 'github'].includes(provider) || state[provider + 'Enabled'] !== true) {
+    if (!state.configured || !client || provider !== 'google' || state.googleEnabled !== true) {
       throw { code: 'provider_disabled' };
     }
     if (!online()) throw { code: 'offline', message: 'offline' };
@@ -257,7 +257,7 @@ function createAccount(deps = {}) {
     const options = { redirectTo };
     // An account chooser avoids silently opening another person's Google session
     // on shared devices. No Google API access or offline provider token is requested.
-    if (provider === 'google') options.queryParams = { prompt: 'select_account' };
+    options.queryParams = { prompt: 'select_account' };
     const result = await client.auth.signInWithOAuth({ provider, options });
     if (result.error) throw result.error;
     return result;
@@ -282,7 +282,6 @@ function createAccount(deps = {}) {
     initialized = true;
     const config = deps.config || win.SLEDOVATKO_AUTH || {};
     state.googleEnabled = config.googleEnabled === true;
-    state.githubEnabled = config.githubEnabled === true;
     state.emailEnabled = config.emailEnabled !== false;
     state.manualLinkingEnabled = config.manualLinkingEnabled === true;
     state.configured = !!(client || (/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(config.url || '') && config.publishableKey));
