@@ -2,7 +2,7 @@
 
 GitHub Pages poskytuje statické HTML, CSS a JavaScript. Účty a cloudová data zajišťuje **Supabase**, přihlášení využívá **GitHub OAuth**. Zdroj webu zůstává v GitHubu a nemusí mít vlastní Node/PHP server. [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
 
-Konfigurace používá `githubEnabled: true` a `emailEnabled: false`. GitHub provider je povolený v Supabase a registrace nových uživatelů je zapnutá. E-mailový poskytovatel je vypnutý a SMTP není nastavené. Používání bez účtu, místní Šuplík a ruční přenos jsou dostupné také bez přihlášení. Tento dokument popisuje nastavení a údržbu; výsledky ověření konkrétního nasazení se evidují samostatně.
+Konfigurace používá `githubEnabled: true`, `googleEnabled: false`, `manualLinkingEnabled: false` a `emailEnabled: false`. GitHub provider je povolený v Supabase, registrace nových uživatelů a potvrzení e-mailu jsou zapnuté. Google rozhraní je připravené, jeho serverový poskytovatel však zatím není nakonfigurovaný ani povolený; čeká dokončení Google projektu podle části níže. E-mailový poskytovatel je vypnutý a SMTP není nastavené. Používání bez účtu, místní Šuplík a ruční přenos jsou dostupné také bez přihlášení. Výsledky ověření konkrétního nasazení se evidují samostatně.
 
 ## 1. Projekt a databáze
 
@@ -13,7 +13,21 @@ Web používá projekt `aovawjyfphduadggedvf` v regionu `eu-west-1`. Pro běžno
 3. V nastavení **Data API → Exposed schemas** ponech `public`. **Nepřidávej `sledovatko_private` mezi Exposed schemas ani Extra search path.** Přístup ke knihovně vede přes dvě veřejné RPC; přímé změny tabulky by obcházely kontrolu souběžných úprav. Stejné soukromé schéma nepřidávej do cesty pro GraphQL. [Exposed schemas](https://supabase.com/docs/guides/api/using-custom-schemas), [GraphQL security](https://supabase.com/docs/guides/graphql/security)
 4. V databázi vznikne `sledovatko_private.user_libraries`. Primární klíč je ID uživatele z `auth.users`, čímž je zároveň indexované vyhledávání i pravidlo RLS. SQL zapíná RLS, nastavuje pravidla vlastníka a omezuje oprávnění. Funkce běží jako volající uživatel (`SECURITY INVOKER`) s prázdným `search_path`. Anonymní návštěvník nemá právo číst ani zapisovat cloud. [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Database functions](https://supabase.com/docs/guides/database/functions)
 
-## 2. Přihlášení přes GitHub
+## 2. Dokončení Google přihlášení
+
+Samostatný Google Cloud projekt **Sledovatko**, ID `sledovatko-508218`, je založený. Nastavení Google Auth Platform čeká na ruční přijetí Google API Services User Data Policy a dokončení připraveného formuláře vlastníkem projektu. OAuth klient a Google provider v Supabase ještě nejsou dokončené. Frontend proto Google tlačítko zatím nezobrazuje.
+
+1. V Google Auth Platform dokonči identitu aplikace a publikum **External**. Kontaktní adresu zvol jako správce aplikace; její skutečnou hodnotu neukládej do repozitáře.
+2. V **Clients** vytvoř klienta typu **Web application**. Authorized JavaScript origin je `https://sledovatko.github.io`. Authorized redirect URI je `https://aovawjyfphduadggedvf.supabase.co/auth/v1/callback`.
+3. Použij pouze `openid`, e-mail a základní profil. Přihlašování nepotřebuje přístup k Gmailu, Disku ani offline Google tokenům. Pro veřejné používání dokonči stav publikování aplikace a případné požadavky Googlu; stav Testing nelze vydávat za veřejně ověřený provoz.
+4. Client ID a client secret ulož do **Supabase → Authentication → Sign In / Providers → Google**. Secret patří pouze do serverového nastavení Supabase. Povol Google; **Skip nonce checks** i **Allow users without an email** ponech vypnuté.
+5. Zachovej přesné návratové adresy z části 3, zapni `googleEnabled: true` v `js/auth-config.js` a publikuj web. Ze skutečné domény ověř přihlášení, návrat na čistou adresu, odhlášení a následné přihlášení. [Supabase Google OAuth](https://supabase.com/docs/guides/auth/social-login/auth-google)
+
+### Připojení Googlu ke stávající sbírce
+
+Supabase může automaticky spojit identity se stejným ověřeným e-mailem. Při rozdílných e-mailech se na automatické spojení nespoléhej. Pro výslovné připojení povol **Allow manual linking** v Supabase a potom `manualLinkingEnabled: true` ve veřejné konfiguraci. Již přihlášený uživatel vybere **Připojit Google k tomuto účtu** a potvrdí Google identitu. Aplikace použije `linkIdentity`, ponechá stejné Supabase user ID a původní způsob přihlášení. Před odchodem musí dokončit synchronizaci; konflikt nebo nedostupná síť propojení pozastaví. Google identitu, která již patří jinému účtu Sledovátka, tento postup automaticky nepřesouvá ani neslučuje. [Propojování identit](https://supabase.com/docs/guides/auth/auth-identity-linking)
+
+## 2a. Zachované přihlášení přes GitHub
 
 Existující GitHub OAuth aplikace má ID `3847728` a veřejný Client ID `Ov23ctwAZbXZXVEToyra`. Do jejího **Authorization callback URL** patří callback Supabase:
 
@@ -71,12 +85,14 @@ Aplikace používá **PKCE**. Přihlašovací tok dokonči ve **stejném prohlí
 
 ## 4. Veřejná konfigurace webu
 
-Projektová URL a veřejný klíč patří do `js/auth-config.js`. Následující ukázka nahrazuje veřejný klíč zástupným textem; přepínače zapínají GitHub přihlášení a ponechávají e-mailový formulář vypnutý:
+Projektová URL a veřejný klíč patří do `js/auth-config.js`. Následující ukázka odpovídá současnému stavu s připraveným, dosud vypnutým Google přihlášením; veřejný klíč nahrazuje zástupným textem:
 
 ```js
 window.SLEDOVATKO_AUTH = {
   url: 'https://aovawjyfphduadggedvf.supabase.co',
   publishableKey: 'ZDE_JE_VE_SKUTECNEM_SOUBORU_VEREJNY_KLIC',
+  googleEnabled: false,
+  manualLinkingEnabled: false,
   githubEnabled: true,
   emailEnabled: false
 };
@@ -94,7 +110,7 @@ Při nasazení přes připravený Actions workflow poběží `node scripts/build
 
 Při **ručním publikování z větve** spusť po poslední úpravě webu `node scripts/build-cache.cjs` a nahraj i výsledný `sw.js`. Pokud skript nespouštíš, změň alespoň hodnotu `CACHE` v `sw.js` na novou unikátní verzi; při přidávání či odebírání souborů je ale nutné upravit také `ASSETS`, proto je generátor spolehlivější. Po zveřejnění obnov stránku a potvrď nabídnutou aktualizaci aplikace. GitHub Actions workflow se při publikování přímo z větve nepoužije.
 
-Bez aktivního poskytovatele přihlášení zůstává funkční používání bez účtu, místní Šuplík i ruční přenos. Publikační workflow samo nezapíná GitHub OAuth ani e-mailovou službu.
+Bez aktivního poskytovatele přihlášení zůstává funkční používání bez účtu, místní Šuplík i ruční přenos. Publikační workflow samo nezapíná Google, GitHub, propojování identit ani e-mailovou službu. Při doplňování dalšího poskytovatele zachovej původní přihlášení a původní Supabase projekt, aby dosavadní účty nadále dosáhly na svoji knihovnu.
 
 ## 5. Cloudový kontrakt a souběh zařízení
 
