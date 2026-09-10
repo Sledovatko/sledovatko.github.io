@@ -3,6 +3,8 @@
 window.SLEDOVATKO_AUTH = Object.freeze({
   url: 'https://aovawjyfphduadggedvf.supabase.co',
   publishableKey: 'sb_publishable_w2GuGjzuzfTiHFcZMvWZag_tBJr05fh',
+  googleEnabled: false,
+  manualLinkingEnabled: false,
   githubEnabled: true,
   emailEnabled: false
 });

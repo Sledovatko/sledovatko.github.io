@@ -117,6 +117,7 @@ Object.assign(App, {
     RuntimeHydrator.reset();
     if(!restore)this.saveRoute();
     this._searchController?.abort(); this._searchSeq=(this._searchSeq||0)+1;
+    this._tonightController?.abort();
     this._homeSeq=(this._homeSeq||0)+1;
     document.querySelectorAll('.movie-card').forEach(card=>{card._hoverActive=false;clearTimeout(card._miniTimer);hideMiniTrailer(card);});
     if(this._boredGrid){this._boredGrid.destroy();this._boredGrid=null;}

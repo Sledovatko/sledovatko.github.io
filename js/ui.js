@@ -113,6 +113,7 @@ function spinner(text = 'Načítám...') {
 }
 
 // ── Movie card ────────────────────────────────────────────────────────────────
+function cardControlIcon(name) { return `<span class="card-control__disc" aria-hidden="true">${icon(name)}</span>`; }
 function movieCard(movie, opts = {}) {
   const saved=Storage.isFavorite(movie.imdbId),watched=Storage.isWatched(movie.imdbId);
   const rating=Storage.getRating(movie.imdbId),progress=movie.mediaType==='tv'?Storage.getTVProgress(movie.imdbId):null;
@@ -126,8 +127,8 @@ function movieCard(movie, opts = {}) {
       <div class="movie-card__watched-overlay" aria-hidden="true"></div>
       <span class="movie-card__watched-badge movie-card__watched-badge--compact" aria-label="Viděno" ${watched?'':'hidden'}>✓</span>
       ${label?`<div class="movie-card__label-strip" style="background:${/^#[a-f0-9]{6}$/i.test(label.color)?label.color:'#888888'}"></div>`:''}
-      ${opts.hideActions?'':`<button class="btn--quick-add glass-icon ${saved?'active':''}" data-action="quick-add" aria-pressed="${saved}" aria-label="${saved?'Odebrat ze Šuplíku':'Uložit do Šuplíku'}: ${escHtml(movie.title)}">${icon(saved?'check':'plus')}</button>
-      <button class="fav-ctx-btn glass-icon" data-action="ctx-menu" aria-label="Možnosti: ${escHtml(movie.title)}">${icon('more')}</button>`}
+      ${opts.hideActions?'':`<button class="btn--quick-add glass-icon ${saved?'active':''}" data-action="quick-add" aria-pressed="${saved}" aria-label="${saved?'Odebrat ze Šuplíku':'Uložit do Šuplíku'}: ${escHtml(movie.title)}">${cardControlIcon(saved?'check':'plus')}</button>
+      <button class="fav-ctx-btn glass-icon" data-action="ctx-menu" aria-label="Možnosti: ${escHtml(movie.title)}">${cardControlIcon('more')}</button>`}
       ${opts.showDate&&movie.releaseDate?`<span class="movie-card__date-badge">${formatRelease(movie.releaseDate)}</span>`:''}
     </div>
     <button class="movie-card__title" data-action="detail" title="${escHtml(movie.title)}">${opts.highlight?highlightText(movie.title,opts.highlight):escHtml(movie.title)}</button>
@@ -301,6 +302,7 @@ function attachCardEvents(container, opts = {}) {
 
     // Enter poster area → start timer
     poster.addEventListener('mouseenter', () => {
+      if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches || document.documentElement.dataset.input === 'touch') return;
       card._hoverActive = true;
       clearTimeout(card._miniTimer);
       card._miniTimer = setTimeout(async () => {
@@ -329,7 +331,7 @@ function attachCardEvents(container, opts = {}) {
       btn.addEventListener('mouseleave', (e) => {
         // Only restart if cursor stayed inside the poster-wrap
         const rel = e.relatedTarget;
-        if (rel && poster.contains(rel) && !rel.closest('button, [data-action], .fav-ctx-btn')) {
+        if (rel && poster.contains(rel) && !rel.closest('button, [data-action], .fav-ctx-btn') && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches && document.documentElement.dataset.input !== 'touch') {
           card._hoverActive = true;
           clearTimeout(card._miniTimer);
           card._miniTimer = setTimeout(async () => {
@@ -407,7 +409,7 @@ function attachCardEvents(container, opts = {}) {
 function _bindQuickAddHover() { /* State changes are explicit on both touch and mouse. */ }
 function updateCardFavState(card, isFav) {
   const qa=card.querySelector('.btn--quick-add'); if(!qa)return;
-  qa.classList.toggle('active',isFav);qa.innerHTML=icon(isFav?'check':'plus');qa.setAttribute('aria-pressed',String(isFav));
+  qa.classList.toggle('active',isFav);qa.innerHTML=cardControlIcon(isFav?'check':'plus');qa.setAttribute('aria-pressed',String(isFav));
   const title=card.querySelector('.movie-card__title')?.textContent||'';
   qa.setAttribute('aria-label',(isFav?'Odebrat ze Šuplíku: ':'Uložit do Šuplíku: ')+title);
 }
@@ -692,6 +694,15 @@ async function openMovieDetail(movie) {
       </div>
     </div>
     <div class="detail-body">
+      <div class="detail-section" id="_gallery-section">
+        <h3>Obrázky</h3>
+        <p id="_gallery-status" role="status" style="color:var(--text3);font-size:13px">Vybírám záběry…</p>
+        <div class="gallery-wrap" style="display:none">
+          <button class="gallery-arrow gallery-arrow--left" id="_gal-left" aria-label="Předchozí obrázky">‹</button>
+          <div class="gallery" id="_gallery"></div>
+          <button class="gallery-arrow gallery-arrow--right" id="_gal-right" aria-label="Další obrázky">›</button>
+        </div>
+      </div>
       ${movie.overview ? `<div class="detail-section"><h3>Popis</h3><p class="detail-overview">${escHtml(movie.overview)}</p></div>` : ''}
       ${movie.mediaType === 'tv' ? `
       <div class="detail-section" id="_episodes-section">
@@ -709,15 +720,6 @@ async function openMovieDetail(movie) {
         </div>
         <div id="_ep-list" class="ep-list"><div class="spinner" style="width:28px;height:28px;margin:24px auto;border-width:3px"></div></div>
       </div>` : ''}
-      <div class="detail-section" id="_gallery-section">
-        <h3>Obrázky</h3>
-        <p id="_gallery-status" role="status" style="color:var(--text3);font-size:13px">Vybírám záběry…</p>
-        <div class="gallery-wrap" style="display:none">
-          <button class="gallery-arrow gallery-arrow--left" id="_gal-left" aria-label="Předchozí obrázky">‹</button>
-          <div class="gallery" id="_gallery"></div>
-          <button class="gallery-arrow gallery-arrow--right" id="_gal-right" aria-label="Další obrázky">›</button>
-        </div>
-      </div>
       <div class="detail-section">
         <h3>👤 Moje hodnocení</h3>
         <div class="rating-buttons" id="_rating-btns">
@@ -744,7 +746,7 @@ async function openMovieDetail(movie) {
     if(!text||!overlay.isConnected)return;
     const section=document.createElement('section');section.className='detail-section';
     section.innerHTML='<h3>Popis</h3><p class="detail-overview">'+escHtml(text)+'</p>';
-    overlay.querySelector('.detail-body').prepend(section);
+    overlay.querySelector('#_gallery-section').after(section);
   }).catch(()=>{});
 
   // Stopáž filmu se načítá až v detailu, aby karty a hover náhledy nedělaly

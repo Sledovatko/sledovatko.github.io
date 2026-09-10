@@ -1,3 +1,10 @@
+// The filter already has a CSS color dot; do not repeat its emoji in the name.
+function libraryLabelName(definition) {
+  const label = String(definition.label || definition.name || '').trim();
+  const emoji = String(definition.emoji || '').trim();
+  return (emoji && label.startsWith(emoji) ? label.slice(emoji.length).trim() : label) || 'Štítek';
+}
+
 Object.assign(App, {
   renderFavorites(){
     const st=this._favState,favs=Storage.getFavorites(),watched=Storage.getWatchedIds(),stats=Storage.getStats();
@@ -16,7 +23,7 @@ Object.assign(App, {
       <div class="search-input-wrap">${icon('search')}<input type="search" id="library-query" aria-label="Hledat ve Šuplíku" placeholder="Hledat ve Šuplíku" value="${escHtml(st.query||'')}"></div>
       <div class="library-status segmented" aria-label="Stav sledování">${[['all','Vše'],['planned','Chci vidět'],['watching','Rozkoukané'],['watched','Viděné']].map(([id,label])=>`<button data-status="${id}" aria-pressed="${(st.status||'all')===id}" class="${(st.status||'all')===id?'active':''}">${label}</button>`).join('')}</div>
       <div class="favs-toolbar"><label class="sr-only" for="fav-sort">Řazení Šuplíku</label><select id="fav-sort" class="sort-select">${[['added','Datum přidání'],['title','Název A–Z'],['rating','Moje hodnocení'],['year','Rok'],['watched','Neviděné první']].map(([id,label])=>`<option value="${id}" ${st.sortBy===id?'selected':''}>${label}</option>`).join('')}</select><span class="muted">${filtered.length} titulů</span></div>
-      <div class="labels-row"><button class="label-filter ${!st.filterLabel?'active':''}" data-label="">Všechny štítky</button>${Object.entries(defs).map(([key,def])=>`<button class="label-filter ${st.filterLabel===key?'active':''}" data-label="${escHtml(key)}" style="--label-color:${def.color}">${escHtml(def.label)}</button>`).join('')}</div>
+      <div class="labels-row"><button type="button" class="label-filter ${!st.filterLabel?'active':''}" data-label="" aria-pressed="${!st.filterLabel}">Všechny štítky</button>${Object.entries(defs).map(([key,def])=>`<button type="button" class="label-filter ${st.filterLabel===key?'active':''}" data-label="${escHtml(key)}" aria-pressed="${st.filterLabel===key}" style="--label-color:${def.color}">${escHtml(libraryLabelName(def))}</button>`).join('')}</div>
       <div id="stats-panel" class="stats-panel ${st.showStats?'open':''}"><div class="stats-grid">${[['Celkem',stats.total],['Viděno',stats.watched],['Zbývá',stats.notWatched],['Moje průměrné hodnocení',stats.avgRating?stats.avgRating.toFixed(1):'—']].map(([name,value])=>`<div class="stat-item"><div class="stat-item__val">${value}</div><span>${name}</span></div>`).join('')}</div></div>
       <div id="favs-content">${!favs.length?this._emptyFavs():!filtered.length?'<div class="empty-state"><h2>Žádný titul nevyhovuje</h2><p>Zkus změnit hledání nebo filtry.</p></div>':st.calendarView?this._buildCalendarView(filtered):'<div class="movie-grid favorites-grid">'+filtered.map(m=>movieCard(m)).join('')+'</div>'}</div></section>`;
     this._attachFavEvents(filtered);
@@ -34,8 +41,8 @@ Object.assign(App, {
   manageLabels(){
     const defs=getAllLabelDefs();
     const modal=showModal('<p class="muted">Skrytí štítku neodebere žádný titul.</p><div class="action-list">'+Object.entries(defs).map(([id,d])=>`<button data-hide-label="${escHtml(id)}">${escHtml(d.label)} <span>Skrýt</span></button>`).join('')+'</div><button class="btn btn--ghost" id="restore-labels">Obnovit skryté štítky</button>',{title:'Spravovat štítky'});
-    modal.querySelectorAll('[data-hide-label]').forEach(b=>b.onclick=()=>{hideLabel(b.dataset.hideLabel);if(this._favState.filterLabel===b.dataset.hideLabel)this._favState.filterLabel=null;b.remove();this.renderFavorites();});
-    modal.querySelector('#restore-labels').onclick=()=>{if(!Account.canEdit()){showToast('Účet není připraven k úpravám');return;}localStorage.setItem('wm_hidden_labels','[]');document.dispatchEvent(new CustomEvent('librarychange'));this.renderFavorites();showToast('Skryté štítky obnoveny');modal.remove();};
+    modal.querySelectorAll('[data-hide-label]').forEach(b=>b.onclick=()=>{try{hideLabel(b.dataset.hideLabel);}catch{return;}if(this._favState.filterLabel===b.dataset.hideLabel)this._favState.filterLabel=null;b.remove();this.renderFavorites();});
+    modal.querySelector('#restore-labels').onclick=()=>{try{Storage.setHiddenLabels([]);}catch{return;}this.renderFavorites();showToast('Skryté štítky obnoveny');modal.remove();};
   },
   _showCtxMenu(event,movie){
     const saved=Storage.isFavorite(movie.imdbId),defs=getAllLabelDefs();
