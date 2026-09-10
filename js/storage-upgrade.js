@@ -76,7 +76,7 @@
   function read(){return Object.fromEntries(keys.filter(k=>localStorage.getItem(k)!==null).map(k=>[k,localStorage.getItem(k)]));}
   function transaction(data){
     const before=read();
-    try{for(const k of keys)localStorage.setItem(k,JSON.stringify(data[k]));}
+    try{for(const k of keys)Storage.persistItem(k,JSON.stringify(data[k]));}
     catch(error){
       // Reclaim all managed keys first. Restoring a larger old value while a
       // later key contains larger new data can otherwise exceed quota again.
@@ -86,6 +86,10 @@
       if(rollbackError)throw Error('Obnovení dat selhalo. Obnov původní zálohu a zkontroluj úložiště prohlížeče.',{cause:rollbackError});
       throw error;
     }
+    // A committed snapshot replaces both metadata maps. Do not let an older
+    // temporary fallback hide it or overwrite it on the next background update.
+    // Keep fallbacks intact if any write failed and the transaction rolled back.
+    Storage.clearTemporaryMetadata();
     if(typeof document!=='undefined'&&typeof document.dispatchEvent==='function'&&typeof CustomEvent==='function')document.dispatchEvent(new CustomEvent('librarychange',{detail:{source:'snapshot'}}));
   }
   function decode(code){

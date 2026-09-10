@@ -18,27 +18,89 @@ const Storage = (() => {
     EPISODES: 'wm_watched_episodes',
     TV_META: 'wm_tv_meta',
     MEDIA_META: 'wm_media_meta',
+    CUSTOM_LABELS: 'wm_custom_labels',
+    HIDDEN_LABELS: 'wm_hidden_labels',
   };
 
   const epCode = (s, e) => `s${s}e${e}`;
+  const temporaryKeys = new Set([K.MEDIA_META, K.TV_META, K.THEME, K.HISTORY, K.COLLAPSED]);
+  const temporaryValues = new Map();
+  // Only these disposable public caches may be reclaimed. In particular,
+  // account snapshots, guest libraries, notes, credentials and drafts are not caches.
+  const disposableKeys = ['wm_api_cache_v1', 'wm_image_selection_v1'];
+  let temporaryRetryAt = 0;
+  const lastNotices = new Map();
+  const quotaError = error => error?.name === 'QuotaExceededError' || error?.name === 'NS_ERROR_DOM_QUOTA_REACHED' || error?.code === 22 || error?.code === 1014;
+  function persistItem(key, value) {
+    try { localStorage.setItem(key, value); }
+    catch (error) {
+      if (!quotaError(error)) throw error;
+      let reclaimed = false;
+      for (const cacheKey of disposableKeys) {
+        try {
+          if (localStorage.getItem(cacheKey) !== null) { localStorage.removeItem(cacheKey); reclaimed = true; }
+        } catch {}
+      }
+      if (!reclaimed) throw error;
+      localStorage.setItem(key, value);
+    }
+  }
+  function notify(message) {
+    const now = Date.now();
+    if (now - (lastNotices.get(message) ?? -Infinity) < 8000) return;
+    lastNotices.set(message, now);
+    if (typeof showToast === 'function') showToast(message);
+  }
+  function requireEditable() {
+    let editable = true, cause;
+    try { if (typeof Account !== 'undefined') editable = Account.canEdit(); }
+    catch (error) { editable = false; cause = error; }
+    if (editable) return;
+    const error = new Error('Účet není připraven k úpravám', cause ? { cause } : undefined);
+    error.name = 'AccountNotReadyError';
+    notify('Účet zatím není připraven k úpravám. Zkontroluj stav přihlášení.');
+    throw error;
+  }
 
   const get = (key, def = null) => {
-    try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; }
+    try { const v = temporaryValues.has(key) ? temporaryValues.get(key) : localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; }
     catch { return def; }
   };
   const set = (key, val) => {
+    const temporary = temporaryKeys.has(key);
+    if (!temporary) requireEditable();
+    const serialized = JSON.stringify(val);
+    if (temporary && Date.now() < temporaryRetryAt) { temporaryValues.set(key, serialized); return false; }
     try {
-      if(typeof Account!=='undefined' && !Account.canEdit() && ![K.MEDIA_META,K.TV_META,K.THEME,K.HISTORY,K.COLLAPSED].includes(key))throw Error('Účet není připraven k úpravám');
-      localStorage.setItem(key, JSON.stringify(val));
-      if(![K.MEDIA_META,K.TV_META,K.THEME,K.HISTORY,K.COLLAPSED].includes(key) && typeof document!=='undefined') document.dispatchEvent(new CustomEvent('librarychange'));
+      persistItem(key, serialized);
+      temporaryValues.delete(key);
     }
-    catch(error) { if(typeof showToast==='function')showToast('Změnu se nepodařilo uložit. Zkontroluj volné místo a možnost ukládání v prohlížeči.'); throw error; }
+    catch(error) {
+      if (temporary) {
+        temporaryValues.set(key, serialized);
+        temporaryRetryAt = Date.now() + 60000;
+        return false;
+      }
+      notify('Změnu se nepodařilo uložit. Zkontroluj volné místo a možnost ukládání v prohlížeči.');
+      throw error;
+    }
+    if (!temporary && typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('librarychange'));
+    return true;
   };
 
   return {
+    // Raw strict persistence is also used by validated snapshot transactions.
+    persistItem,
+    clearTemporaryMetadata() {
+      temporaryValues.delete(K.TV_META);
+      temporaryValues.delete(K.MEDIA_META);
+      temporaryRetryAt = 0;
+    },
+    setCustomLabels(value) { set(K.CUSTOM_LABELS, value); },
+    setHiddenLabels(value) { set(K.HIDDEN_LABELS, value); },
     // ── Token ────────────────────────────────────────────────────────────────
-    getToken() { return localStorage.getItem(K.TOKEN) || ''; },
-    setToken(t) { localStorage.setItem(K.TOKEN, t); },
+    getToken() { try { return localStorage.getItem(K.TOKEN) || ''; } catch { return ''; } },
+    setToken(t) { persistItem(K.TOKEN, t); },
 
     // ── Témata ───────────────────────────────────────────────────────────────
     getTheme() { return get(K.THEME, 'dark'); },
@@ -385,18 +447,14 @@ function getCustomLabelDefs() {
   try { return JSON.parse(localStorage.getItem('wm_custom_labels') || '{}'); } catch { return {}; }
 }
 function saveCustomLabelDef(key, color, name, emoji = '🏷️') {
-  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const defs = getCustomLabelDefs();
   defs[key] = { color, name, emoji };
-  localStorage.setItem('wm_custom_labels', JSON.stringify(defs));
-  document.dispatchEvent(new CustomEvent('librarychange'));
+  Storage.setCustomLabels(defs);
 }
 function deleteCustomLabelDef(key) {
-  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const defs = getCustomLabelDefs();
   delete defs[key];
-  localStorage.setItem('wm_custom_labels', JSON.stringify(defs));
-  document.dispatchEvent(new CustomEvent('librarychange'));
+  Storage.setCustomLabels(defs);
 }
 
 // Hide label (works for both predefined and custom — marks as hidden, does NOT wipe film assignments)
@@ -404,11 +462,9 @@ function getHiddenLabelKeys() {
   try { return new Set(JSON.parse(localStorage.getItem('wm_hidden_labels') || '[]')); } catch { return new Set(); }
 }
 function hideLabel(key) {
-  if(typeof Account!=='undefined'&&!Account.canEdit())throw Error('Účet není připraven k úpravám');
   const hidden = getHiddenLabelKeys();
   hidden.add(key);
-  localStorage.setItem('wm_hidden_labels', JSON.stringify([...hidden]));
-  document.dispatchEvent(new CustomEvent('librarychange'));
+  Storage.setHiddenLabels([...hidden]);
   // Keep definitions and assignments so hiding a label remains reversible.
 }
 function getAllLabelDefs() {
