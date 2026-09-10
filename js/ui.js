@@ -453,20 +453,12 @@ async function ensureCardRuntime(card, movie) {
 // ── Mini trailer — Netflix-style backdrop preview ─────────────────────────────
 let _miniPlayerActive = null;
 let _miniBox = null;
+let _miniRequest = 0;
 
 async function showMiniTrailer(card, movie) {
   if (_miniPlayerActive) hideMiniTrailer(_miniPlayerActive);
   _miniPlayerActive = card;
-
-  // Darken viewport
-  let bd = document.getElementById('_mini-bd');
-  if (!bd) {
-    bd = document.createElement('div');
-    bd.id = '_mini-bd';
-    bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:40;pointer-events:none;transition:background .35s';
-    document.body.appendChild(bd);
-  }
-  requestAnimationFrame(() => { bd.style.background = 'rgba(0,0,0,0.55)'; });
+  const request = ++_miniRequest;
 
   // Fetch backdrops + optionally Vimeo (YouTube embeds are universally blocked by video owners — Error 153)
   let vimeoId = null;
@@ -483,9 +475,19 @@ async function showMiniTrailer(card, movie) {
     backdropUrls = images;
   } catch {}
 
-  if (!card._hoverActive || _miniPlayerActive !== card || !document.body.contains(card)) {
-    _cleanupBackdrop(); return;
+  if (request !== _miniRequest || !card._hoverActive || _miniPlayerActive !== card || !document.body.contains(card)) {
+    return;
   }
+  if (!vimeoId && !backdropUrls.length && !movie.backdropUrl && !movie.posterUrl) return;
+
+  // Keep browsing unobstructed while the first set of varied frames is selected.
+  // An obsolete request must not clear a newer preview's backdrop.
+  document.getElementById('_mini-bd')?.remove();
+  const bd = document.createElement('div');
+  bd.id = '_mini-bd';
+  bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:40;pointer-events:none;transition:background .35s';
+  document.body.appendChild(bd);
+  requestAnimationFrame(() => { bd.style.background = 'rgba(0,0,0,0.55)'; });
 
   const rect = card.getBoundingClientRect();
   const BOX_W = Math.min(380, window.innerWidth - 32);
@@ -606,6 +608,7 @@ function hideMiniTrailer(card) {
   if (!card) return;
   clearTimeout(card._miniTimer);
   if (_miniPlayerActive === card) {
+    _miniRequest++;
     _miniPlayerActive = null;
     if (_miniBox) { clearInterval(_miniBox._slideInterval); _miniBox.remove(); _miniBox = null; }
     _cleanupBackdrop();
@@ -706,12 +709,13 @@ async function openMovieDetail(movie) {
         </div>
         <div id="_ep-list" class="ep-list"><div class="spinner" style="width:28px;height:28px;margin:24px auto;border-width:3px"></div></div>
       </div>` : ''}
-      <div class="detail-section" id="_gallery-section" style="display:none">
+      <div class="detail-section" id="_gallery-section">
         <h3>Obrázky</h3>
-        <div class="gallery-wrap">
-          <button class="gallery-arrow gallery-arrow--left" id="_gal-left">‹</button>
+        <p id="_gallery-status" role="status" style="color:var(--text3);font-size:13px">Vybírám záběry…</p>
+        <div class="gallery-wrap" style="display:none">
+          <button class="gallery-arrow gallery-arrow--left" id="_gal-left" aria-label="Předchozí obrázky">‹</button>
           <div class="gallery" id="_gallery"></div>
-          <button class="gallery-arrow gallery-arrow--right" id="_gal-right">›</button>
+          <button class="gallery-arrow gallery-arrow--right" id="_gal-right" aria-label="Další obrázky">›</button>
         </div>
       </div>
       <div class="detail-section">
@@ -931,17 +935,21 @@ async function openMovieDetail(movie) {
   // seriálů se mohou shodovat, proto je nelze zaměňovat.
   try {
     const images = await (movie.mediaType === 'tv' ? API.getTVImages(movie.id) : API.getMovieImages(movie.id));
+    if (!overlay.isConnected) return;
     if (images.length) {
       const section  = overlay.querySelector('#_gallery-section');
       const gallery  = overlay.querySelector('#_gallery');
       const galLeft  = overlay.querySelector('#_gal-left');
       const galRight = overlay.querySelector('#_gal-right');
-      section.style.display = '';
-      gallery.innerHTML = images.map(url =>
-        `<img class="gallery__img" src="${url}" alt="záběr" loading="lazy" data-full="${url.replace('w780','w1280')}" style="cursor:zoom-in">`
+      section.querySelector('#_gallery-status').remove();
+      section.querySelector('.gallery-wrap').style.display = '';
+      gallery.innerHTML = images.map((url, index) =>
+        `<button type="button" class="gallery__preview" aria-label="Zvětšit záběr ${index + 1} z ${images.length}: ${escHtml(movie.title)}" style="border:0;padding:0;background:none;flex-shrink:0;border-radius:8px;cursor:zoom-in">
+          <img class="gallery__img" src="${escHtml(url.replace('/w780/', '/w300/'))}" srcset="${escHtml(url.replace('/w780/', '/w300/'))} 300w, ${escHtml(url)} 780w" sizes="214px" width="214" height="120" alt="${escHtml(movie.title)} — záběr ${index + 1}" loading="lazy" decoding="async" data-full="${escHtml(url.replace('/w780/','/w1280/'))}" style="display:block">
+        </button>`
       ).join('');
       gallery.addEventListener('click', e => {
-        const img = e.target.closest('.gallery__img');
+        const img = e.target.closest('.gallery__preview')?.querySelector('img');
         if (!img) return;
         showModal('<img class="gallery-full" src="'+escHtml(img.dataset.full)+'" alt="Záběr z '+escHtml(movie.title)+'">', {title:movie.title+' — galerie'});
       });
@@ -952,10 +960,24 @@ async function openMovieDetail(movie) {
       galLeft.addEventListener('click',  () => gallery.scrollBy({ left: -300, behavior: 'smooth' }));
       galRight.addEventListener('click', () => gallery.scrollBy({ left:  300, behavior: 'smooth' }));
       gallery.addEventListener('scroll', updateGalArrows, { passive: true });
-      await Promise.allSettled([...gallery.querySelectorAll('img')].map(img => new Promise(res => { if (img.complete) res(); else { img.onload = res; img.onerror = res; } })));
+      gallery.querySelectorAll('img').forEach(img => img.addEventListener('error', () => {
+        img.closest('.gallery__preview').remove();
+        if (!gallery.childElementCount) section.style.display = 'none';
+        updateGalArrows();
+      }, { once: true }));
+      if ('ResizeObserver' in window) {
+        const resize = new ResizeObserver(updateGalArrows);
+        resize.observe(gallery);
+        overlay.addEventListener('modal-closed', () => resize.disconnect(), { once: true });
+      }
       updateGalArrows();
+    } else {
+      overlay.querySelector('#_gallery-section').style.display = 'none';
     }
-  } catch {}
+  } catch {
+    const status = overlay.querySelector('#_gallery-status');
+    if (status && overlay.isConnected) status.textContent = 'Záběry se nepodařilo načíst.';
+  }
 }
 
 // Otevři detail seriálu (zajistí mediaType='tv' → ukáže výběr sérií a epizod)
