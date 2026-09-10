@@ -25,10 +25,11 @@
       <p>Vymazání dat webu odstraní místní uložená data. Anonymní režim nebo omezené úložiště mohou jejich uchování zkrátit či znemožnit. Důležitou sbírku si můžeš exportovat jako zálohu.</p>
     </section>
     <section>
-      <h2>2. Přihlášení přes Google nebo GitHub</h2>
-      <p>Při použití některého z nabízených poskytovatelů přihlášení Sledovátko prostřednictvím Supabase získá identifikátor účtu, e-mail a základní profilové údaje, které poskytovatel zpřístupní, například jméno nebo profilový obrázek. Slouží k rozpoznání účtu, jeho zobrazení v aplikaci a přiřazení správné sbírky.</p>
-      <p>Heslo ke Googlu nebo GitHubu zadáváš u daného poskytovatele; Sledovátko ho nedostává. Přihlášení přes Google nepožaduje přístup ke Gmailu, souborům na Disku Google ani kontaktům. Přihlašovací údaje a profil zpracovává služba Supabase Auth.</p>
-      <p>Tajný klíč přihlášení Google či GitHub je součástí serverového nastavení Supabase, nikoli veřejných souborů webu. V prohlížeči se ukládá relace potřebná pro přístup k tvému účtu; proto na sdíleném zařízení po použití zvol odhlášení.</p>
+      <h2>2. Přihlášení přes Google</h2>
+      <p>Sledovátko nabízí přihlášení pouze přes Google. Prostřednictvím Supabase získá identifikátor účtu, e-mail a základní profilové údaje, které Google zpřístupní, například jméno nebo profilový obrázek. Slouží k rozpoznání účtu, jeho zobrazení v aplikaci a přiřazení správné sbírky. Přihlášení e-mailem a heslem je vypnuté.</p>
+      <p>Heslo ke Googlu zadáváš přímo u Googlu; Sledovátko ho nedostává. Přihlášení nepožaduje přístup ke Gmailu, souborům na Disku Google ani kontaktům. Přihlašovací údaje a profil zpracovává služba Supabase Auth.</p>
+      <p>Tajný klíč přihlášení Google je součástí serverového nastavení Supabase, nikoli veřejných souborů webu. V prohlížeči se ukládá relace potřebná pro přístup k tvému účtu; proto na sdíleném zařízení po použití zvol odhlášení.</p>
+      <p>Dřívější propojené identity a uložené sbírky zůstávají u svých účtů. Vypnutí GitHub přihlášení je nemaže; přihlášení k účtu s připojeným Googlem pokračuje přes Google.</p>
     </section>
     <section>
       <h2>3. Cloudová sbírka</h2>
@@ -44,7 +45,7 @@
       <p>Podrobnosti poskytovatelů najdeš v jejich zásadách soukromí:</p>
       <ul>
         <li><a href="https://policies.google.com/privacy?hl=cs" target="_blank" rel="noopener noreferrer">Google a YouTube</a> — přihlášení a videoobsah.</li>
-        <li><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub</a> — přihlášení a hosting webu.</li>
+        <li><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub</a> — hosting webu.</li>
         <li><a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a> — účty a cloudová databáze.</li>
         <li><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener noreferrer">TMDB</a> — katalog a obrázky.</li>
         <li><a href="https://vimeo.com/legal/privacy/policy" target="_blank" rel="noopener noreferrer">Vimeo</a> — vložená videa.</li>
