@@ -5,6 +5,28 @@
   --fx-ease:cubic-bezier(.2,.8,.2,1);
 }
 body{isolation:isolate}
+/* Keep the carousel's upper hover clearance, with tighter spacing below cards. */
+.home-page .category{margin-bottom:8px}
+.home-page .category__row{padding-bottom:10px}
+#continue-slot .category{margin-bottom:8px}
+#continue-slot .category__row{padding-bottom:10px}
+
+/* Corner controls retain a 44px hit area even when the visible disc is smaller. */
+.movie-card .btn--quick-add,.movie-card .fav-ctx-btn{right:3px}
+.movie-card .btn--quick-add{top:3px}
+.movie-card .fav-ctx-btn{bottom:3px}
+.search-page .movie-card .fav-ctx-btn{bottom:35px;right:3px}
+@media(max-width:600px){
+  .search-page .movie-card .btn--quick-add,.search-page .movie-card .fav-ctx-btn{
+    right:0;border-left-width:14px!important;border-right-width:2px!important;
+  }
+  .search-page .movie-card .btn--quick-add{
+    top:0;border-top-width:2px!important;border-bottom-width:14px!important;
+  }
+  .search-page .movie-card .fav-ctx-btn{
+    bottom:30px;border-top-width:12px!important;border-bottom-width:4px!important;
+  }
+}
 body::before{
   display:block;inset:-12%;z-index:-1;filter:none;opacity:.72;
   background:radial-gradient(ellipse at 8% 10%,#d9952527,transparent 40%),

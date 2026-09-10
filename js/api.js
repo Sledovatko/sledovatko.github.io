@@ -9,6 +9,10 @@ const API = (() => {
   const _genreCache = {};
   const memoryCache = new Map();
   const CACHE_KEY = 'wm_api_cache_v1';
+  // Reserve localStorage for the library. Raw image galleries can be hundreds
+  // of kilobytes each and never belong in the persistent metadata cache.
+  const MAX_CACHE_CHARS = 128 * 1024, MAX_ENTRY_CHARS = 24 * 1024;
+  const persistentPath = path => /^\/(movie|tv)\/\d+(?:\/season\/\d+)?\?language=/.test(path);
   const cacheTTL = path => {
     if (/\/movie\/\d+\?language=/.test(path)) return 30 * 86400000;
     if (/\/tv\/\d+\/season\/\d+\?/.test(path)) return 12 * 3600000;
@@ -16,21 +20,46 @@ const API = (() => {
     if (/\/(images|videos)/.test(path)) return 3 * 86400000;
     return 5 * 60000;
   };
+  function compactCache(cache) {
+    if (!cache || typeof cache !== 'object' || Array.isArray(cache)) return {};
+    const result = {};
+    let size = 2;
+    const entries = Object.entries(cache).filter(([path, value]) => persistentPath(path) &&
+      Number.isFinite(value?.time) && value.time <= Date.now() && Date.now() - value.time < cacheTTL(path) && value.data && typeof value.data === 'object')
+      .sort((a, b) => b[1].time - a[1].time);
+    for (const [path, value] of entries) {
+      const entrySize = JSON.stringify(path).length + JSON.stringify(value).length + 2;
+      if (entrySize > MAX_ENTRY_CHARS || size + entrySize > MAX_CACHE_CHARS) continue;
+      result[path] = value; size += entrySize;
+      if (Object.keys(result).length >= 40) break;
+    }
+    return result;
+  }
+  let persistentCache = {};
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw && raw.length > MAX_CACHE_CHARS) localStorage.removeItem(CACHE_KEY);
+    else if (raw) {
+      persistentCache = compactCache(JSON.parse(raw));
+      const compact = JSON.stringify(persistentCache);
+      if (compact !== raw) {
+        if (Object.keys(persistentCache).length) localStorage.setItem(CACHE_KEY, compact);
+        else localStorage.removeItem(CACHE_KEY);
+      }
+    }
+  } catch {}
   const readCache = (path, ttl) => {
     if (!ttl) return null;
-    try {
-      const hit = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')[path];
-      return hit && Date.now() - hit.time < ttl ? hit.data : null;
-    } catch { return null; }
+    const hit = persistentCache[path];
+    return hit && Date.now() - hit.time < ttl ? hit.data : null;
   };
   const writeCache = (path, data, ttl) => {
-    if (!ttl) return;
+    if (!ttl || !persistentPath(path)) return;
+    persistentCache[path] = { time: Date.now(), data };
+    persistentCache = compactCache(persistentCache);
     try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      cache[path] = { time: Date.now(), data };
-      const newest = Object.entries(cache).sort((a,b) => b[1].time - a[1].time).slice(0,80);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(newest)));
-    } catch {}
+      localStorage.setItem(CACHE_KEY, JSON.stringify(persistentCache));
+    } catch { try { localStorage.removeItem(CACHE_KEY); } catch {} }
   };
 
   const headers = () => ({
@@ -70,9 +99,11 @@ const API = (() => {
   const IMAGE_SELECTION_KEY = 'wm_image_selection_v1';
   const imageSelections = new Map();
   const imagesInFlight = new Map();
-  const validImagePath = path => typeof path === 'string' && /^\/[A-Za-z0-9_-]+\.(jpe?g|png|webp)$/i.test(path);
+  const validImagePath = path => typeof path === 'string' && path.length <= 200 && /^\/[A-Za-z0-9_-]+\.(jpe?g|png|webp)$/i.test(path);
   try {
-    const saved = JSON.parse(localStorage.getItem(IMAGE_SELECTION_KEY) || '[]');
+    const raw = localStorage.getItem(IMAGE_SELECTION_KEY) || '[]';
+    if (raw.length > 64 * 1024) localStorage.removeItem(IMAGE_SELECTION_KEY);
+    const saved = raw.length <= 64 * 1024 ? JSON.parse(raw) : [];
     if (Array.isArray(saved)) saved.slice(0, 50).reverse().forEach(entry => {
       if (!Array.isArray(entry) || entry.length !== 2) return;
       const [key, value] = entry;
@@ -99,6 +130,7 @@ const API = (() => {
       while (imageSelections.size > 50) imageSelections.delete(imageSelections.keys().next().value);
       try {
         const live = [...imageSelections].filter(([, value]) => value.expires > Date.now()).reverse();
+        while (live.length && JSON.stringify(live).length > 64 * 1024) live.pop();
         localStorage.setItem(IMAGE_SELECTION_KEY, JSON.stringify(live));
       } catch {}
       return paths.map(path => backdrop(path));
