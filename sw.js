@@ -1,5 +1,5 @@
 // Versioned public assets only. Auth/API responses and user snapshots are never cached here.
-const CACHE="sledovatko-shell-b219b90972b1";
+const CACHE="sledovatko-shell-a18c560d924e";
 const ASSETS=["./index.html","./privacy.html","./terms.html","./manifest.webmanifest","./js/account-ui.js","./js/account.js","./js/api.js","./js/app.js","./js/auth-config.js","./js/bored.js","./js/config.js","./js/discovery.js","./js/effects.js","./js/image-selection.js","./js/library.js","./js/navigation.js","./js/platform.js","./js/runtime.js","./js/search.js","./js/storage-upgrade.js","./js/storage.js","./js/touch-controls.js","./js/transfer.js","./js/ui.js","./js/vendor/qrcode.js","./js/vendor/supabase.js","./css/account.css","./css/base.css","./css/concept.css","./css/effects.css","./css/liquid.css","./css/usability.css","./icons/icon-192.png","./icons/icon-512.png","./icons/icon.svg"];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS.map(url=>new Request(url,{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith('sledovatko-shell-')&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));
