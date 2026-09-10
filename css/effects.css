@@ -1,0 +1,192 @@
+/* Light and motion, independent of layout and account behavior. */
+:root{
+  --fx-gold:255,194,62;
+  --fx-ice:128,207,222;
+  --fx-ease:cubic-bezier(.2,.8,.2,1);
+}
+body{isolation:isolate}
+body::before{
+  display:block;inset:-12%;z-index:-1;filter:none;opacity:.72;
+  background:radial-gradient(ellipse at 8% 10%,#d9952527,transparent 40%),
+    radial-gradient(ellipse at 91% 37%,#529daf17,transparent 36%),
+    radial-gradient(ellipse at 36% 95%,#be6b1919,transparent 42%);
+  animation:fx-ambient 24s ease-in-out infinite alternate;
+}
+body::after{
+  z-index:-1;opacity:.42;
+  background:radial-gradient(1px 1px at 14% 18%,#ffdfa2 50%,transparent),
+    radial-gradient(1px 1px at 78% 12%,#a6d6e4 50%,transparent),
+    radial-gradient(1px 1px at 94% 65%,#ffdfa2 50%,transparent),
+    radial-gradient(1px 1px at 36% 85%,#e9c987 50%,transparent);
+}
+@keyframes fx-ambient{from{transform:translate3d(-2%,-1%,0) scale(1)}to{transform:translate3d(2%,3%,0) scale(1.08)}}
+
+/* Keep the letter edges crisp; the light blooms outside the glyphs. */
+#screen .page-heading h1,#screen .home-logo,#screen .bored-topbar__title{
+  background-image:linear-gradient(110deg,#ffe6a8 5%,#ffcb55 32%,#fff3cf 49%,#ffc13d 66%,#f6b333 93%);
+  background-size:230% 100%;background-clip:text;-webkit-background-clip:text;
+  color:transparent!important;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 3px #ffe1a21c,0 0 17px #ffbe3847,0 0 38px #e98b2024!important;
+  filter:drop-shadow(0 0 9px #ffbd333b);
+  animation:fx-title-shine 16s ease-in-out infinite;
+}
+@keyframes fx-title-shine{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.page-heading{position:relative;isolation:isolate}
+.page-heading::after{
+  content:'';position:absolute;left:0;right:0;bottom:9px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,#ffd57170,#d69e3519 34%,transparent 74%);
+  box-shadow:0 1px 12px #ffb72b26;
+}
+.page-heading::before{
+  content:'';position:absolute;left:-18px;top:2px;width:220px;height:100%;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 28% 50%,#ffbf3112,transparent 70%);
+}
+.category__title,#continue-slot .category__title,.discover-section>h2,.search-empty h2{
+  text-shadow:0 0 12px #fff1cc1e,0 3px 18px #ffbf3310;
+}
+
+/* Specular reflection is separate from the poster's readability gradient. */
+.movie-card{
+  --fx-x:50%;--fx-y:30%;--fx-rx:0deg;--fx-ry:0deg;
+  transform-origin:center 65%;border-radius:17px;will-change:auto;
+  transition:transform .52s var(--fx-ease),box-shadow .4s ease,filter .4s ease,border-color .3s ease;
+}
+.movie-card__poster-wrap{
+  transition:box-shadow .4s ease,border-color .35s ease;
+}
+.movie-card__poster{
+  transition:transform .85s var(--fx-ease),filter .65s ease;
+}
+.movie-card__poster-wrap::before{
+  content:'';position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(ellipse at var(--fx-x) var(--fx-y),#fff3d147,transparent 58%),
+    linear-gradient(118deg,transparent 27%,#d9f5ff15 41%,#fff5d448 48%,#ffd78312 56%,transparent 72%);
+  background-size:100% 100%,230% 100%;background-position:0 0,100% 0;
+  opacity:0;mix-blend-mode:screen;
+  transition:opacity .4s ease,background-position .8s var(--fx-ease);
+}
+.movie-card:focus-within .movie-card__poster-wrap::before{opacity:.48;background-position:0 0,0% 0}
+.movie-card:focus-within .movie-card__poster-wrap{
+  box-shadow:0 0 0 1px #ffce6eaa,0 0 24px #ffbb3038,0 14px 32px #0008;
+}
+.search-page .movie-grid .movie-card:focus-within,#continue-slot .movie-card:focus-within{
+  border-color:#ffd580b3;box-shadow:inset 0 1px 1px #fff9,0 0 0 1px #ffce6e55,0 0 24px #ffbb3038,0 14px 32px #0008;
+}
+/* Reveal only when observed. Unobserved cards always remain visible. */
+.movie-grid .movie-card{animation:none}
+.movie-card.fx-reveal.fx-visible .movie-card__poster{animation:fx-poster-arrive .65s var(--fx-ease) backwards}
+@keyframes fx-poster-arrive{from{opacity:.25;transform:scale(1.075)}to{opacity:1;transform:scale(1)}}
+
+@media(hover:hover) and (pointer:fine){
+  .movie-card:hover,.movie-card.fx-card-active{
+    transform:perspective(850px) translateY(-8px) rotateX(var(--fx-rx)) rotateY(var(--fx-ry)) scale(1.035)!important;
+    z-index:6;
+  }
+  .movie-card.fx-card-active{will-change:transform;transition:transform .14s ease-out,box-shadow .4s ease,filter .4s ease}
+  .movie-card:hover .movie-card__poster,.movie-card.fx-card-active .movie-card__poster{
+    transform:scale(1.085);filter:saturate(1.12) brightness(1.055);
+  }
+  .movie-card:hover .movie-card__poster-wrap,.movie-card.fx-card-active .movie-card__poster-wrap{
+    border-color:#ffe2a9a6;
+    box-shadow:inset 0 1px 1px #fff9,0 0 0 1px #ffce6e80,0 0 26px #ffbe334a,0 18px 38px #0009;
+  }
+  .search-page .movie-grid .movie-card:hover,.search-page .movie-grid .movie-card.fx-card-active,
+  #continue-slot .movie-card:hover,#continue-slot .movie-card.fx-card-active{
+    border-color:#ffe2a9b3;
+    box-shadow:inset 0 1px 1px #fff9,0 0 0 1px #ffce6e70,0 0 24px #ffbe3345,0 18px 38px #0009;
+  }
+  .movie-card:hover .movie-card__poster-wrap::before,.movie-card.fx-card-active .movie-card__poster-wrap::before{
+    opacity:.82;background-position:0 0,0% 0;
+  }
+  .movie-card:hover .movie-card__title{text-shadow:0 0 12px #ffe8b44d,0 2px 8px #000}
+  .movie-card:hover .movie-card__rating{filter:drop-shadow(0 0 5px #ffb82655)}
+  .category__row{padding-top:18px;padding-bottom:28px}
+  .category__arrow{z-index:8}
+}
+
+/* A light sweep, warmer edges and tactile feedback for controls. */
+.btn,.glass-icon,.mood-chip,.segmented button,.history-query,.nav-btn{
+  will-change:auto;
+  transition:transform .3s var(--spring),box-shadow .35s ease,border-color .3s ease,filter .3s ease,color .25s ease;
+}
+.btn--primary{
+  box-shadow:inset 0 1px 2px #fff9,inset 0 -2px 3px #c87a1655,0 0 18px #ffc12d3b,0 6px 24px #f3a4221a!important;
+}
+.btn::after{background:linear-gradient(110deg,transparent,#fff9,transparent);transition:left .7s var(--fx-ease)}
+.search-input-wrap:focus-within{
+  border-color:#ffd578b3!important;
+  box-shadow:var(--shadow),0 0 0 2px #ffcb4220,0 0 28px #ffbf3326!important;
+}
+.segmented button.active,.mood-chip.active{filter:drop-shadow(0 0 6px #ffc33d26)}
+@media(hover:hover) and (pointer:fine){
+  .btn--primary:hover{filter:brightness(1.1) saturate(1.1);box-shadow:inset 0 1px 2px #fffc,0 0 26px #ffc12d69,0 10px 30px #f3a42230!important}
+  .glass-icon:hover,.btn--ghost:hover,.mood-chip:hover,.history-query:hover{
+    border-color:#ffdb85b3!important;filter:brightness(1.12);
+    box-shadow:inset 0 1px 2px #fffb,inset 0 -1px 1px #ffe6a266,0 0 18px #ffc23330,0 8px 24px #0005!important;
+  }
+  .movie-card .btn--quick-add:hover,.movie-card .fav-ctx-btn:hover{filter:brightness(1.25);transform:scale(1.08)}
+  .nav-btn:hover{color:#ffe3a0;transform:translateY(-2px)}
+}
+
+/* Hero, dialogs and navigation share the same illuminated glass edges. */
+.tonight-hero{
+  border-color:#ffd68e80;
+  box-shadow:inset 0 1px 1px #fff9,0 0 0 1px #ffcb5024,0 0 32px #ffb93419,0 14px 36px #0007;
+}
+.tonight-hero::before{
+  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at 85% 4%,#ffe4a230,transparent 52%);
+  animation:fx-hero-light 12s ease-in-out infinite alternate;
+}
+@keyframes fx-hero-light{from{opacity:.35}to{opacity:.9}}
+.tonight-copy{z-index:2}
+.tonight-title{text-shadow:0 2px 9px #000c,0 0 24px #ffda7d26}
+.bored-btn{transition:transform .35s var(--spring),box-shadow .35s ease,border-color .3s ease}
+.modal{
+  border-top-color:#ffe4ac70!important;
+  box-shadow:inset 0 1px 1px #fff7,0 0 0 1px #ffce5020,0 0 46px #ffbb3215,0 30px 90px #000a!important;
+}
+.detail-poster{box-shadow:0 0 0 1px #ffe0a24a,0 0 28px #ffbb322b,0 14px 32px #0008}
+#bottom-nav{
+  box-shadow:inset 0 1px 1px #fff9,inset 0 -1px 1px #ddb45f80,0 0 0 1px #ffcf6820,0 0 28px #e8a73318,0 10px 34px #000a!important;
+}
+.nav-btn.active::before{
+  display:block;content:'';position:absolute;inset:9px 14% 8px;width:auto;height:auto;border-radius:24px;
+  background:radial-gradient(ellipse,#ffc33d25,transparent 72%);z-index:-1;pointer-events:none;
+}
+.nav-btn{isolation:isolate}
+.nav-btn.active svg{filter:drop-shadow(0 0 4px #ffd35b99) drop-shadow(0 0 12px #ffbd3355)}
+#bottom-nav::after{box-shadow:0 0 9px #ffcf7799,0 3px 22px #ffbd3359}
+
+@media(max-width:600px){
+  body::before{opacity:.55;animation-duration:30s}
+  #screen .page-heading h1,#screen .home-logo{
+    text-shadow:0 0 3px #ffe1a224,0 0 14px #ffbe3852,0 0 30px #e98b2026!important;
+  }
+  .movie-card:active{filter:brightness(1.13)}
+  .movie-card:active .movie-card__poster-wrap::before{opacity:.55}
+  .search-page .movie-card .btn--quick-add:hover,.search-page .movie-card .fav-ctx-btn:hover{box-shadow:none!important}
+}
+@media(hover:none),(pointer:coarse){
+  .movie-card:hover{transform:none!important}
+  .movie-card:hover .movie-card__poster{transform:none;filter:none}
+  .movie-card:hover .movie-card__poster-wrap::after{transform:translateX(-135%)}
+  .movie-card:active{transform:scale(.985)!important}
+}
+[data-theme=light] body::before,body[data-theme=light]::before{opacity:.3}
+[data-theme=light] body::after,body[data-theme=light]::after{opacity:.12}
+[data-theme=light] #screen .page-heading h1,[data-theme=light] #screen .home-logo,[data-theme=light] #screen .bored-topbar__title{
+  background-image:linear-gradient(110deg,#91620d,#b07d18 36%,#71500c 54%,#b17d1a 73%,#91620d);
+  text-shadow:0 0 18px #d7963029!important;filter:drop-shadow(0 0 7px #dca03b24);
+}
+[data-theme=light] .category__title{text-shadow:none}
+[data-theme=light] .nav-btn:hover{color:#91620d}
+
+/* Motion preference wins over all earlier hover and entrance overrides. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .movie-card:hover,.movie-card:active,.movie-card.fx-card-active{transform:none!important}
+  .movie-card:hover .movie-card__poster,.movie-card.fx-card-active .movie-card__poster{transform:none!important;filter:none}
+  .movie-card__poster-wrap::before{background:radial-gradient(ellipse at 50% 20%,#fff3d12e,transparent 65%)}
+  .movie-card__poster-wrap::after{transition:none!important}
+}

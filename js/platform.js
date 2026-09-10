@@ -27,7 +27,8 @@ function openHelp() {
     try{
       const registration=await navigator.serviceWorker.register('./sw.js');
       function updateReady(worker){
-        if(!worker||!navigator.serviceWorker.controller)return;
+        if(!worker||worker.state==='redundant'||!navigator.serviceWorker.controller)return;
+        document.querySelectorAll('.update-notice').forEach(notice=>notice.remove());
         const notice=document.createElement('div');notice.className='update-notice';notice.setAttribute('role','status');
         notice.innerHTML='<span>Je připravená nová verze.</span><button type="button" class="btn btn--ghost">Načíst</button>';
         document.body.appendChild(notice);
