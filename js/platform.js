@@ -26,7 +26,9 @@ function openHelp() {
   if('serviceWorker' in navigator && location.protocol!=='file:'){
     try{
       const registration=await navigator.serviceWorker.register('./sw.js');
-      function updateReady(worker){
+      let reloading=false,reloadRequested=false,hadController=!!navigator.serviceWorker.controller;
+      function reloadOnce(){if(!reloading){reloading=true;location.reload();}}
+      function updateReady(worker,active=false){
         if(!worker||worker.state==='redundant'||!navigator.serviceWorker.controller)return;
         document.querySelectorAll('.update-notice').forEach(notice=>notice.remove());
         const notice=document.createElement('div');notice.className='update-notice';notice.setAttribute('role','status');
@@ -34,6 +36,14 @@ function openHelp() {
         document.body.appendChild(notice);
         notice.querySelector('button').onclick=async()=>{
           if(Account.user && !(await Account.sync())){showToast('Nejprve dokonči synchronizaci nebo vyřeš konflikt.');return;}
+          if(worker.state==='redundant'){
+            updateReady(registration.waiting);
+            if(!registration.waiting)notice.remove();
+            showToast('Aktualizace se změnila. Zkus znovu načíst novou verzi.');return;
+          }
+          // A different app window may have activated this worker meanwhile.
+          if(active||worker.state==='activated'){reloadOnce();return;}
+          reloadRequested=true;
           worker.postMessage({type:'ACTIVATE'});
         };
       }
@@ -42,8 +52,12 @@ function openHelp() {
         const worker=registration.installing;
         worker?.addEventListener('statechange',()=>{if(worker.state==='installed')updateReady(registration.waiting);});
       });
-      let reloading=false,hadController=!!navigator.serviceWorker.controller;
-      navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!hadController){hadController=true;return;}if(!reloading){reloading=true;location.reload();}});
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(!hadController){hadController=true;return;}
+        if(reloadRequested){reloadOnce();return;}
+        // Another client updating must not interrupt a gesture or an edit here.
+        updateReady(navigator.serviceWorker.controller,true);
+      });
     }catch{/* App remains fully usable when installation is unavailable. */}
   }
 })().catch(()=>{
