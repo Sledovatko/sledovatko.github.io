@@ -65,6 +65,48 @@ const API = (() => {
   const backdrop = (path, size = 'w780') => path ? `${IMG_BASE}/${size}${path}` : '';
   const still = (path, size = 'w300') => path ? `${IMG_BASE}/${size}${path}` : '';
 
+  // A gallery and a hover preview share one selection, including concurrent opens.
+  // Store only public image paths, never decoded pixels or full image responses.
+  const IMAGE_SELECTION_KEY = 'wm_image_selection_v1';
+  const imageSelections = new Map();
+  const imagesInFlight = new Map();
+  const validImagePath = path => typeof path === 'string' && /^\/[A-Za-z0-9_-]+\.(jpe?g|png|webp)$/i.test(path);
+  try {
+    const saved = JSON.parse(localStorage.getItem(IMAGE_SELECTION_KEY) || '[]');
+    if (Array.isArray(saved)) saved.slice(0, 50).reverse().forEach(entry => {
+      if (!Array.isArray(entry) || entry.length !== 2) return;
+      const [key, value] = entry;
+      if (/^(movie|tv):\d+$/.test(key) && Number.isFinite(value?.expires) &&
+          value.expires > Date.now() && value.expires <= Date.now() + 3 * 86400000 &&
+          Array.isArray(value.paths) && value.paths.length <= 8 && value.paths.every(validImagePath)) {
+        imageSelections.set(key, value);
+      }
+    });
+  } catch {}
+  function getSelectedImages(type, id) {
+    const key = `${type}:${id}`;
+    if (!/^(movie|tv):\d+$/.test(key)) return Promise.resolve([]);
+    const hit = imageSelections.get(key);
+    if (hit?.expires > Date.now()) return Promise.resolve(hit.paths.map(path => backdrop(path)));
+    if (imagesInFlight.has(key)) return imagesInFlight.get(key);
+    const pending = (async () => {
+      const data = await get(`/${type}/${id}/images`);
+      const selected = await ImageSelection.select(data.backdrops || []);
+      const paths = [...new Set(selected.paths.filter(validImagePath))].slice(0, 8);
+      const ttl = selected.verified && paths.length ? 3 * 86400000 : 5 * 60000;
+      imageSelections.delete(key);
+      imageSelections.set(key, { paths, expires: Date.now() + ttl });
+      while (imageSelections.size > 50) imageSelections.delete(imageSelections.keys().next().value);
+      try {
+        const live = [...imageSelections].filter(([, value]) => value.expires > Date.now()).reverse();
+        localStorage.setItem(IMAGE_SELECTION_KEY, JSON.stringify(live));
+      } catch {}
+      return paths.map(path => backdrop(path));
+    })().finally(() => imagesInFlight.delete(key));
+    imagesInFlight.set(key, pending);
+    return pending;
+  }
+
   const parseMovie = (j, mediaType = 'movie') => {
     const release = j.release_date || j.first_air_date || '';
     const votes = j.vote_count || 0;
@@ -193,17 +235,7 @@ const API = (() => {
     },
 
     async getMovieImages(movieId) {
-      const data = await get(`/movie/${movieId}/images`);
-      const backdrops = (data.backdrops || [])
-        .filter(b => !b.iso_639_1 || b.iso_639_1 === 'en' || b.iso_639_1 === 'xx')
-        .sort((a, b) => b.vote_average - a.vote_average);
-      const seen = new Set();
-      const unique = [];
-      for (const b of backdrops) {
-        const bucket = `${Math.round(b.width / 50)}_${Math.round(b.height / 50)}`;
-        if (!seen.has(bucket)) { seen.add(bucket); unique.push(b); }
-      }
-      return unique.slice(0, 10).map(b => backdrop(b.file_path));
+      return getSelectedImages('movie', movieId);
     },
 
     async getMovieVideos(movieId) {
@@ -219,17 +251,7 @@ const API = (() => {
     // TV a filmy mohou mít stejné číselné ID. Proto se pro seriály musí vždy
     // používat endpoint /tv/*; jinak se např. u Futuramy načtou obrázky cizího filmu.
     async getTVImages(tvId) {
-      const data = await get(`/tv/${tvId}/images`);
-      const backdrops = (data.backdrops || [])
-        .filter(b => !b.iso_639_1 || b.iso_639_1 === 'en' || b.iso_639_1 === 'xx')
-        .sort((a, b) => b.vote_average - a.vote_average);
-      const seen = new Set();
-      const unique = [];
-      for (const b of backdrops) {
-        const key = b.file_path || `${b.width}_${b.height}`;
-        if (!seen.has(key)) { seen.add(key); unique.push(b); }
-      }
-      return unique.slice(0, 10).map(b => backdrop(b.file_path));
+      return getSelectedImages('tv', tvId);
     },
 
     async getTVVideos(tvId) {
