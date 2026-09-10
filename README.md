@@ -1,8 +1,8 @@
-# Sledovátko — liquid glass, verze 3
+# Sledovátko
 
 Statická aplikace pro GitHub Pages. Nepotřebuje vlastní aplikační server ani instalaci balíčků; při publikování se generuje verze offline cache.
 
-Účty používají přihlášení přes GitHub a cloudovou synchronizaci v Supabase. Konfigurace má `githubEnabled: true` a `emailEnabled: false`; e-mailové přihlášení je vypnuté. Místní Šuplík, hledání a ruční přenos fungují také bez účtu. Nastavení backendu a postupy údržby popisuje [backend/README.md](backend/README.md).
+Účty používají přihlášení přes GitHub a cloudovou synchronizaci v Supabase. Google přihlášení a připojení Googlu k existujícímu účtu jsou připravené v rozhraní, ale zatím zůstávají vypnuté do dokončení nastavení poskytovatele. Aktuální přepínače jsou `githubEnabled: true`, `googleEnabled: false`, `manualLinkingEnabled: false` a `emailEnabled: false`. Místní Šuplík, hledání a ruční přenos fungují také bez účtu. Nastavení backendu a postup dokončení Googlu popisuje [backend/README.md](backend/README.md).
 
 ## Nasazení
 
@@ -14,15 +14,18 @@ Statická aplikace pro GitHub Pages. Nepotřebuje vlastní aplikační server an
 ## Funkce
 
 - Tmavý zlatý liquid glass vzhled, průsvitné ovladače, pružné reakce na stisk, animované přechody a respektování systémového omezení pohybu v běžném rozhraní.
-- Mobilní hledání přes celou šířku, tři karty vedle sebe i při 320 px, filtry ve spodním panelu s tlačítkem Použít, aktivní filtry a samostatné řazení. Na větších obrazovkách se počet sloupců přizpůsobuje prostoru.
+- Mobilní hledání i Šuplík používají tři karty vedle sebe při šířce od 320 px. Hledání má filtry ve spodním panelu s tlačítkem Použít, aktivní filtry a samostatné řazení. Na větších obrazovkách se počet sloupců přizpůsobuje prostoru.
 - Jedno klepnutí na plakát otevírá detail. Samostatné skleněné + ukládá, … otevírá možnosti. Po odebrání lze změnu vrátit. Akce detailu jsou dostupné dole i při procházení dlouhého popisu nebo epizod.
+- Dotykové ovládání rozlišuje klepnutí, posouvání a gesto více prsty. Při posouvání řady se neotevírá detail; na dotykovém zařízení se nespouští náhled určený pro najetí myší. Vodorovné řady se ovládají tažením, na počítači zůstávají dostupné šipky. Okrajová gesta obsluhuje samostatná dotyková vrstva; běžné posouvání uvnitř stránky zůstává nativní.
 - Hledání zpracuje vždy poslední dotaz, umí další stránky bez duplicit a hledá i podle původního názvu. Výchozí hledání ve filmech i seriálech používá dvě katalogová volání místo desítek volání přes mnoho stránek a jazyků.
+- Uložená hledání mají samostatné tlačítko odebrání. Klepnutí na název spustí hledání; křížek ho pouze odebere z uložených. Stejný výslovný stav používá i ovladač nad výsledky, takže opakované odebrání položku znovu neuloží.
 - Domovská stránka ukazuje rozkoukané seriály s dalším dílem, výběr na večer a katalog. Seriálové žánry používají skutečné seriálové výsledky.
 - Karty v Pokračovat ve sledování neobsahují + ani …; detail otevře klepnutí na plakát nebo název. Zachovávají postup a označení další epizody.
 - Vzhled tvoří černé sklo, stříbrné odlesky hran, zlaté gradienty a názvy přes tmavou spodní část plakátů. Plakáty a hodnocení vycházejí ze skutečného obsahu katalogu.
 - Mobilní hledání používá menší kruhové ovladače s větší neviditelnou plochou pro klepnutí. Tři tečky jsou v mobilním hledání na úrovni názvu u pravého okraje. Jejich dotyková plocha má 44 × 44 px a nepřekrývá plochu názvu.
-- Šuplík má vlastní hledání, stavy Chci vidět / Rozkoukané / Viděné, řazení, štítky, statistiky a přehled podle roku. Skryté štítky lze obnovit.
-- Výběr na večer nabízí uložené či nové filmy, časový limit, jen neviděné a vynechání hororů. Zachované jsou i filmové plátno, Hot or Not a program tří filmů.
+- Šuplík má vlastní hledání, stavy Chci vidět / Rozkoukané / Viděné, řazení a čistší nabídku dalších možností. Štítky mají jednu barevnou značku místo opakovaných ikon. Statistiky a seskupení podle roku jsou v nabídce Šuplíku; skryté štítky lze obnovit. Také seskupení podle roku zachovává na mobilu tři sloupce.
+- Výběr na večer nabízí uložené či nové filmy, pouze neviděné a 12 časových voleb: bez omezení nebo limit 30, 45, 60, 90, 120, 150, 180, 210, 240, 300 a 360 minut. Lze současně vynechat více žánrů. Vybraná omezení platí pro Šuplík i nový katalog; chybějící metadata se před doporučením doplňují v omezené frontě.
+- Galerie záběrů je v detailu před popisem. Výběr omezuje vizuálně podobné obrázky; záběr lze zvětšit klepnutím nebo klávesnicí. Zachované jsou i filmové plátno, Hot or Not a program tří filmů.
 - Escape a tlačítko Zpět zavírají otevřené detaily, filtry, trailer i galerii. Návrat mezi stránkami obnovuje hledání, filtry a pozici.
 - Film a seriál se stejným číselným ID již nesdílejí stav sledování, poznámky ani hodnocení.
 
@@ -40,7 +43,7 @@ Kód i odkaz obsahují poznámky a hodnocení, proto je předávej pouze zamýš
 
 ## Struktura
 
-`css/base.css` zachovává základ původního vzhledu; `css/liquid.css` obsahuje responzivní základ. Finální podobu podle vizuálního konceptu a tři sloupce hledání určuje `css/concept.css`; účty doplňuje `css/account.css`. Chování je rozděleno do samostatných souborů pro API, data, navigaci, hledání, domovskou stránku, Šuplík a přenos.
+`css/base.css` a `css/liquid.css` tvoří základ vzhledu a rozložení, `css/concept.css` a `css/effects.css` vizuální efekty. Poslední vrstva `css/usability.css` upravuje ovládání a mobilní mřížky; `css/account.css` pokrývá účty. `js/touch-controls.js` rozlišuje dotyková gesta a zabraňuje dvojímu aktivování karty. Další chování je rozděleno do souborů pro API, data, navigaci, hledání, domovskou stránku, Šuplík a přenos.
 
 `js/config.js` obsahuje veřejnou frontendovou konfiguraci TMDB. Katalog a plakáty potřebují internet a dostupné TMDB API. `js/auth-config.js` obsahuje veřejnou konfiguraci Supabase; tajné klíče patří pouze do nastavení poskytovatele. QR knihovna je přibalená lokálně pod MIT licencí.
 
@@ -52,6 +55,8 @@ Stopáže se načítají automaticky jen pro viditelné karty. Fronta dovolí ne
 
 První úspěšné přihlášení přes GitHub vytvoří účet ve Sledovátku. Automatická synchronizace používá oddělené knihovny uživatelů a kontrolu revize. Pokud dvě zařízení změní tutéž knihovnu, uživatel vidí porovnání a zvolí další postup. Místní sbírka se do účtu převezme až po výběru uživatele. Neodeslané změny blokují běžné odhlášení; při nucené změně relace zůstane kopie spojená s původním účtem pro jeho další přihlášení. E-mailová registrace a obnova hesla jsou volitelná možnost a ve výchozí konfiguraci jsou vypnuté.
 
+Připravený Google tok používá stejné tlačítko pro přihlášení i první vytvoření účtu, bez nového hesla. Po dokončení Google Cloud projektu a povolení poskytovatele v Supabase lze zapnout `googleEnabled`. Pro již přihlášené uživatele je připravené výslovné připojení Googlu ke stejnému účtu: vyžaduje také serverové Allow manual linking a `manualLinkingEnabled`. Před přesměrováním se uloží rozepsaná poznámka a při propojení dokončí synchronizace. Samotné nahrání zdrojů tato serverová nastavení nezapne.
+
 Přihlášení přes GitHub nevyžaduje SMTP. Pro případné zapnutí e-mailové registrace je potřeba vlastní SMTP, potvrzování e-mailu a ověření doručování i obnovy hesla podle [backend/README.md](backend/README.md). Přihlašovací tok dokonči ve stejném prohlížeči a zařízení, kde začal.
 
 Manifest a service worker umožňují instalaci na plochu a opětovné otevření už načteného základního rozhraní při výpadku připojení. V offline režimu je dostupný místní Šuplík; nový katalog, nenačtené plakáty a přihlášení vyžadují síť. Aktualizace má vlastní tlačítko a před výměnou verze ověří dokončení cloudové synchronizace. Auth/API odpovědi se do service worker cache neukládají.
@@ -62,9 +67,9 @@ Importy nyní ověřují typy, URL obrázků, rozměry dat a identitu titulů. P
 
 - Sestavení a obsah veřejného balíčku: `node scripts/test-build-cache.cjs`.
 - Databázové chování a oddělení účtů: `backend/tests/library.sql`; postup a integrační scénáře jsou v [backend/README.md](backend/README.md).
-- Rozhraní: hledání a nabídky karet při 320 a 390 px, tablet při 768 px a desktop při 1280 px; dále skutečný telefon, ovládání klávesnicí, import a export.
+- Rozhraní: hledání, Šuplík, nabídky karet a účet při 320 a 390 px, tablet při 768 px a desktop při 1280 px; dále skutečný iPhone/Safari, rozlišení klepnutí a posouvání, okrajová gesta, ovládání klávesnicí, import a export.
 - Po publikování: přihlášení a odhlášení na veřejné doméně, synchronizace dvou prohlížečů, výpadek sítě a nabídka aktualizace offline kopie.
 
-Výsledky konkrétního nasazení eviduj samostatně. Databázové testy a místní simulace přihlášení samy nepotvrzují skutečný OAuth průchod ani synchronizaci mezi zařízeními.
+Výsledky konkrétního nasazení a místní regresní testy eviduj samostatně mimo veřejný balíček. Testovací kopie se simulovaným přihlášením se nepublikují. Databázové testy a místní simulace samy nepotvrzují skutečný OAuth průchod, fyzický iPhone ani synchronizaci mezi zařízeními.
 
 Základní knihovny jsou přibalené: Supabase JS 2.116.0 a qrcode-generator 2.0.4, obě pod MIT licencí. Web nepoužívá plovoucí CDN verze.
