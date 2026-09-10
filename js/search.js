@@ -135,7 +135,9 @@ Object.assign(App, {
   },
   renderSearchResults(){
     const res=document.getElementById('search-results');if(!res)return;
-    const st=this._searchState,items=this._sortMovies(st.items||[],st.sortBy,st.query);
+    const st=this._searchState;
+    if(!st.query.trim()&&!this._hasSearchFilters(st.filters)){this.renderSearchEmpty();return;}
+    const items=this._sortMovies(st.items||[],st.sortBy,st.query);
     const more=Object.values(st.pages||{}).some(p=>!p.done)||st.partialError;
     const savedQuery=st.query.trim(),querySaved=Storage.getSavedSearches().includes(savedQuery);
     res.innerHTML=`<div class="results-summary"><span>Zobrazeno ${items.length} titulů</span>${savedQuery?`<button type="button" class="btn btn--ghost btn--sm" id="save-query" aria-label="${querySaved?'Odebrat uložené hledání':'Uložit hledání'}: ${escHtml(savedQuery)}">${querySaved?icon('close')+' Odebrat uložené hledání':'☆ Uložit hledání'}</button>`:''}</div>
