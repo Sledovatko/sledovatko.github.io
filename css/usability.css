@@ -2,6 +2,10 @@
 html,body,#app,#screen{overscroll-behavior-x:none}
 .category__row,.gallery,.mood-chips,.labels-row{overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom}
 .card-control__disc{display:contents}
+.site-footer,.account-legal{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 14px;font-size:13px;color:var(--text2)}
+.site-footer{margin-top:22px;padding:16px 0;border-top:1px solid var(--edge)}
+.account-legal{margin:12px 0 4px}
+.site-footer a,.account-legal a{display:inline-flex;align-items:center;min-height:44px;color:var(--text2);text-underline-offset:3px}
 .library-page>.page-heading:has(.library-menu[open]){z-index:30}
 .detail-overlay .detail-footer .btn{position:relative;overflow:hidden;isolation:isolate}
 .detail-overlay .detail-footer .btn::after{border-radius:inherit;pointer-events:none}
