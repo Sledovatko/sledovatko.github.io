@@ -56,7 +56,7 @@ function accountGithubButton() {
 function accountOAuthButtons() {
   const google = Account.googleEnabled === true ? `<button type="button" class="account-oauth account-oauth--google" data-account-oauth="google">${ACCOUNT_GOOGLE_ICON}<span>Pokračovat přes Google</span></button>` : '';
   const buttons = google + accountGithubButton();
-  return buttons ? `<div class="account-providers">${buttons}</div>` : '';
+  return buttons ? `<div class="account-providers">${buttons}</div><p class="account-legal"><a href="privacy.html" target="_blank" rel="noopener">Soukromí</a><span aria-hidden="true">·</span><a href="terms.html" target="_blank" rel="noopener">Podmínky používání</a></p>` : '';
 }
 function accountIdentityProviders() {
   return [...new Set([...(Account.user?.identities || []).map(identity => identity.provider), ...(Account.user?.app_metadata?.providers || [])])]

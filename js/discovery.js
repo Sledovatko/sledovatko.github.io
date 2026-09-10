@@ -66,6 +66,7 @@ Object.assign(App, {
       <section class="discover-section"><h2>Objevovat</h2><div class="segmented home-media-tabs" id="media-tabs" aria-label="Typ obsahu">${[['movie','Filmy'],['tv','Seriály']].map(([id,label])=>`<button class="home-media-tab ${state.mediaType===id?'active':''}" data-media="${id}" aria-pressed="${state.mediaType===id}">${label}</button>`).join('')}</div>
       <div class="mood-chips" id="mood-chips" aria-label="Žánr"></div><div id="main-cats">${spinner('Načítám tituly…')}</div></section>
       <div class="discovery-extras"><button class="bored-btn" id="btn-bored"><span class="bored-btn__emoji">🎲</span><span>Nevím, co si pustit</span>${icon('arrow')}</button><button class="bored-btn" id="btn-hotnot-home"><span class="bored-btn__emoji">🔥</span><span>Hot or Not</span>${icon('arrow')}</button><button class="btn btn--ghost" id="btn-kino">Kino večer · program tří filmů</button></div>
+      <footer class="site-footer"><a href="privacy.html">Soukromí</a><span aria-hidden="true">·</span><a href="terms.html">Podmínky používání</a></footer>
     </div>`;
     bindAccountButtons();
     document.getElementById('btn-sync').onclick=()=>showSyncModal();
