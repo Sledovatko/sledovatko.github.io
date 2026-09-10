@@ -27,6 +27,13 @@
 .account-submit,.account-guest{display:flex;width:100%;min-height:48px}
 .account-oauth{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;gap:12px;font-size:15px}
 .account-oauth svg{width:21px;height:21px}
+.account-providers{display:grid;gap:12px}
+.account-oauth--google{min-height:50px;padding:12px 18px;border:1px solid #747775;border-radius:14px;background:#fff;color:#1f1f1f;font-family:Arial,sans-serif;font-weight:600;line-height:1.4;box-shadow:0 2px 8px #00000014;transition:background .2s,box-shadow .2s}
+.account-oauth--google svg{width:20px;height:20px;flex:0 0 20px}
+.account-oauth--google:hover{background:#f8faff;box-shadow:0 3px 12px #00000024}
+.account-oauth--google:focus-visible{outline:3px solid #8ab4f8;outline-offset:3px}
+.account-oauth--google:disabled{opacity:.65;cursor:wait}
+.account-feedback:not([hidden])+.account-providers{margin-top:16px}
 .account-oauth-note{margin:14px 2px 20px;color:var(--text2);font-size:13px;line-height:1.7;text-align:center}
 .account-or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text3);font-size:12px;text-align:center}
 .account-or::before,.account-or::after{content:'';height:1px;flex:1;background:var(--edge)}
@@ -42,6 +49,9 @@
 .account-feedback{font-size:14px;line-height:1.55;color:var(--text);padding:12px 14px;border:1px solid #d7d2c733;border-radius:12px;background:#ffffff08;margin:0}
 .account-feedback--error{color:#ffb4a1;border-color:#ff988550;background:#ff917e0a}
 .account-email{overflow-wrap:anywhere;font-size:14px}
+.account-connected{margin:18px 0 12px;color:var(--text2);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.account-connected strong{font-weight:600;color:var(--text)}
+.account-link-google{margin-top:12px}
 .account-sync-status{display:flex;gap:13px;align-items:flex-start;padding:17px;margin:0 0 18px;background:var(--glass);border:1px solid var(--edge);border-radius:18px;box-shadow:var(--shadow)}
 .account-sync-status>.account-status-dot{margin-top:7px}
 .account-sync-status strong{font-size:14px;font-weight:650}
