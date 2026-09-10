@@ -2,7 +2,7 @@
 
 Statická aplikace pro GitHub Pages. Nepotřebuje vlastní aplikační server ani instalaci balíčků; při publikování se generuje verze offline cache.
 
-Účty používají přihlášení přes GitHub a cloudovou synchronizaci v Supabase. Google přihlášení a připojení Googlu k existujícímu účtu jsou připravené v rozhraní, ale zatím zůstávají vypnuté do dokončení nastavení poskytovatele. Aktuální přepínače jsou `githubEnabled: true`, `googleEnabled: false`, `manualLinkingEnabled: false` a `emailEnabled: false`. Místní Šuplík, hledání a ruční přenos fungují také bez účtu. Nastavení backendu a postup dokončení Googlu popisuje [backend/README.md](backend/README.md).
+Účty používají přihlášení přes Google nebo GitHub a cloudovou synchronizaci v Supabase. Google aplikace má publikum External a stav In production; oba poskytovatelé a výslovné propojení identit jsou povolené v Supabase. Přepínače jsou `googleEnabled: true`, `manualLinkingEnabled: true`, `githubEnabled: true` a `emailEnabled: false`. Místní Šuplík, hledání a ruční přenos fungují také bez účtu. Nastavení backendu popisuje [backend/README.md](backend/README.md); výsledky konkrétního nasazení a přihlášení se evidují samostatně.
 
 ## Nasazení
 
@@ -53,11 +53,11 @@ Pro místní náhled spusť libovolný statický HTTP server v této složce, na
 
 Stopáže se načítají automaticky jen pro viditelné karty. Fronta dovolí nejvýše dva současné požadavky a zahajuje je alespoň 350 ms od sebe. Stejný titul má společný požadavek; odchod ze stránky nebo skrytí karty ruší nepotřebné načítání. Cache pojme 600 záznamů: filmy 30 dní, odhad délky dílu a chybějící délky jeden den. Chyby mají prodlevu, HTTP 429 na minutu zastaví frontu. Film ukazuje hodiny:minuty; seriál „≈ 25 min/díl“. Součet všech sezón se neodhaduje potichu.
 
-První úspěšné přihlášení přes GitHub vytvoří účet ve Sledovátku. Automatická synchronizace používá oddělené knihovny uživatelů a kontrolu revize. Pokud dvě zařízení změní tutéž knihovnu, uživatel vidí porovnání a zvolí další postup. Místní sbírka se do účtu převezme až po výběru uživatele. Neodeslané změny blokují běžné odhlášení; při nucené změně relace zůstane kopie spojená s původním účtem pro jeho další přihlášení. E-mailová registrace a obnova hesla jsou volitelná možnost a ve výchozí konfiguraci jsou vypnuté.
+První úspěšné přihlášení přes Google nebo GitHub vytvoří účet ve Sledovátku. Automatická synchronizace používá oddělené knihovny uživatelů a kontrolu revize. Pokud dvě zařízení změní tutéž knihovnu, uživatel vidí porovnání a zvolí další postup. Místní sbírka se do účtu převezme až po výběru uživatele. Neodeslané změny blokují běžné odhlášení; při nucené změně relace zůstane kopie spojená s původním účtem pro jeho další přihlášení. E-mailová registrace a obnova hesla jsou volitelná možnost a ve výchozí konfiguraci jsou vypnuté.
 
-Připravený Google tok používá stejné tlačítko pro přihlášení i první vytvoření účtu, bez nového hesla. Po dokončení Google Cloud projektu a povolení poskytovatele v Supabase lze zapnout `googleEnabled`. Pro již přihlášené uživatele je připravené výslovné připojení Googlu ke stejnému účtu: vyžaduje také serverové Allow manual linking a `manualLinkingEnabled`. Před přesměrováním se uloží rozepsaná poznámka a při propojení dokončí synchronizace. Samotné nahrání zdrojů tato serverová nastavení nezapne.
+Google používá stejné tlačítko pro přihlášení i první vytvoření účtu, bez nového hesla. Kdo už má sbírku pod GitHub účtem, přihlásí se nejprve přes GitHub a v účtu vybere **Připojit Google k tomuto účtu**. Výslovné propojení zachová stejné Supabase user ID i původní přihlášení. Před přesměrováním se uloží rozepsaná poznámka a dokončí synchronizace; nevyřešený konflikt propojení pozastaví. Samotné nahrání zdrojů nemění serverová nastavení poskytovatelů.
 
-Přihlášení přes GitHub nevyžaduje SMTP. Pro případné zapnutí e-mailové registrace je potřeba vlastní SMTP, potvrzování e-mailu a ověření doručování i obnovy hesla podle [backend/README.md](backend/README.md). Přihlašovací tok dokonči ve stejném prohlížeči a zařízení, kde začal.
+Přihlášení přes Google ani GitHub nevyžaduje SMTP. Pro případné zapnutí e-mailové registrace je potřeba vlastní SMTP, potvrzování e-mailu a ověření doručování i obnovy hesla podle [backend/README.md](backend/README.md). Přihlašovací tok dokonči ve stejném prohlížeči a zařízení, kde začal.
 
 Manifest a service worker umožňují instalaci na plochu a opětovné otevření už načteného základního rozhraní při výpadku připojení. V offline režimu je dostupný místní Šuplík; nový katalog, nenačtené plakáty a přihlášení vyžadují síť. Aktualizace má vlastní tlačítko a před výměnou verze ověří dokončení cloudové synchronizace. Auth/API odpovědi se do service worker cache neukládají.
 

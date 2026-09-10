@@ -352,11 +352,21 @@ function createAccount(deps = {}) {
       }
       await acceptSession(session);
     } catch {
-      await acceptSession(null);
-      emit('error', 'Odkaz už neplatí nebo byl otevřen v jiném prohlížeči. Přihlas se nebo si vyžádej nový odkaz.');
+      // Clear callback details even if restoring storage or the session fails.
       const url = new URL(win.location.href);
       for (const key of ['code','auth','error','error_code','error_description']) url.searchParams.delete(key);
       win.history.replaceState(null, '', url.pathname + url.search + '#home');
+      // Cancelling identity linking does not end the existing Supabase session.
+      // Restore that session instead of replacing its library with the guest's.
+      let remainingSession = null;
+      try {
+        const result = await client.auth.getSession();
+        if (!result.error) remainingSession = result.data?.session || null;
+      } catch {}
+      const accepted = await acceptSession(remainingSession);
+      if (accepted !== false) emit('error', remainingSession?.user
+        ? 'Přihlášení nebo připojení dalšího účtu se nepodařilo dokončit. Tvůj současný účet zůstává přihlášený.'
+        : 'Odkaz už neplatí nebo byl otevřen v jiném prohlížeči. Přihlas se nebo si vyžádej nový odkaz.');
     } finally { booting = false; }
   }
   Object.assign(state, {
