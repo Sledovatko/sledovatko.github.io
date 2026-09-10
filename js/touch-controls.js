@@ -6,6 +6,8 @@
   const edgeWidth = 18, tapDistance = 10;
   const horizontalSelector = '.category__row,.gallery,.mood-chips,.labels-row,.cal-row';
   let gesture = null, lastTouch = 0, compatibilityTap = null;
+  let multiTouch = false, standalone = false;
+  const displayMode = window.matchMedia?.('(display-mode: standalone)');
   const now = () => Date.now();
   const point = (list, id) => Array.from(list || []).find(t => t.identifier === id);
   const available = el => el?.isConnected && !el.closest('[inert]') && !el.disabled;
@@ -36,11 +38,38 @@
     if (typeof hideMiniTrailer === 'function') hideMiniTrailer(card);
   }
   function reset() { gesture = null; }
+  function resetTouches() { reset(); multiTouch = false; }
+  function updateDisplayMode() {
+    standalone = displayMode?.matches === true || window.navigator?.standalone === true;
+    document.documentElement.dataset.displayMode = standalone ? 'standalone' : 'browser';
+    resetTouches();
+  }
+  updateDisplayMode();
+  if (displayMode?.addEventListener) displayMode.addEventListener('change', updateDisplayMode);
+  else displayMode?.addListener?.(updateDisplayMode);
+  const appSurface = target => target === document.body || target === document.documentElement || target?.closest?.('#app,.modal-overlay');
+  function blockPinch(event) {
+    if (!standalone || (!multiTouch && !appSurface(event.target))) return false;
+    multiTouch = true;
+    reset();
+    if (event.cancelable) event.preventDefault();
+    return true;
+  }
+  // WebKit's GestureEvents supplement touch-action on installed iOS apps.
+  // Do not release the touch latch at gestureend: one finger can still be down.
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(type, event => {
+      if (!standalone || !appSurface(event.target)) return;
+      reset();
+      if (event.cancelable) event.preventDefault();
+    }, { capture: true, passive: false });
+  }
 
   document.addEventListener('touchstart', event => {
     lastTouch = now();
     compatibilityTap = null;
     document.documentElement.dataset.input = 'touch';
+    if ((multiTouch || event.touches.length > 1) && blockPinch(event)) return;
     if (event.touches.length !== 1 || !event.target.closest) { reset(); return; }
     const target = event.target, surface = target.closest('#app,.modal-overlay');
     if (!surface || target.closest('[inert]')) { reset(); return; }
@@ -61,6 +90,7 @@
   }, { capture: true, passive: false });
 
   document.addEventListener('touchmove', event => {
+    if ((multiTouch || event.touches.length > 1) && blockPinch(event)) return;
     const state = gesture;
     if (!state) return;
     if (event.touches.length !== 1) { reset(); return; }
@@ -76,6 +106,13 @@
   }, { capture: true, passive: false });
 
   document.addEventListener('touchend', event => {
+    if (multiTouch) {
+      if (event.cancelable) event.preventDefault();
+      const touch = event.changedTouches[0];
+      if (touch) compatibilityTap = { time: now(), x: touch.clientX, y: touch.clientY };
+      if (!event.touches.length) resetTouches();
+      return;
+    }
     const state = gesture; reset();
     if (!state || event.touches.length) return;
     const touch = point(event.changedTouches, state.id);
@@ -97,11 +134,14 @@
       event.preventDefault(); event.stopImmediatePropagation(); compatibilityTap = null;
     }
   }, true);
-  document.addEventListener('touchcancel', reset, { capture: true, passive: true });
+  document.addEventListener('touchcancel', event => {
+    reset();
+    if (!event.touches.length) multiTouch = false;
+  }, { capture: true, passive: true });
   document.addEventListener('scroll', () => { if (gesture && !gesture.owned) gesture.moved = true; }, { capture: true, passive: true });
   document.addEventListener('pointermove', event => {
     if (event.pointerType === 'mouse' && now() - lastTouch > 800) document.documentElement.dataset.input = 'mouse';
   }, { passive: true });
-  window.addEventListener('blur', reset);
-  window.addEventListener('pagehide', reset);
+  window.addEventListener('blur', resetTouches);
+  window.addEventListener('pagehide', resetTouches);
 })();
