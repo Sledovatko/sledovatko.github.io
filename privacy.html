@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d0f">
+  <meta name="description" content="Jak Sledovátko ukládá tvoji sbírku, používá přihlášení a komunikuje s dalšími službami.">
+  <title>Soukromí a ukládání dat · Sledovátko</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <style>
+    *{box-sizing:border-box}html{color-scheme:dark}body{margin:0;background:radial-gradient(ellipse at 0 0,#b47d171c,transparent 45%),#090d0f;color:#eeeae2;font:16px/1.75 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:#ffda83;text-underline-offset:4px;overflow-wrap:anywhere}a:hover{color:#fff0ca}a:focus-visible{outline:2px solid #ffcc57;outline-offset:4px;border-radius:3px}header,main,footer{width:min(100% - 40px,780px);margin-inline:auto}header{padding:28px 0 20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff20}header a{display:inline-flex;align-items:center;min-height:44px}.brand{font-size:25px;font-weight:750;text-decoration:none;text-shadow:0 0 20px #ffc23955}.back{font-size:14px}main{padding:36px 0}h1{font-size:clamp(29px,6vw,43px);line-height:1.16;margin:8px 0 18px;color:#ffe1a0;letter-spacing:-1px;text-shadow:0 0 28px #ffc23926}h2{font-size:21px;line-height:1.4;margin:0 0 12px;color:#fff2d4}p{margin:0 0 14px}section{padding:24px;border:1px solid #ffffff17;border-radius:20px;background:linear-gradient(140deg,#ffffff06,#ffffff02);margin:18px 0}.intro{font-size:18px;color:#c7c5be}.date{font-size:13px;color:#a4a7a7}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#d2b473}ul{padding-left:21px}li+li{margin-top:8px}footer{border-top:1px solid #ffffff20;padding:22px 0 35px;display:flex;flex-wrap:wrap;gap:14px 24px;font-size:14px}footer a{min-height:44px;display:inline-flex;align-items:center}@media(max-width:420px){header,main,footer{width:calc(100% - 28px)}section{padding:20px}}
+  </style>
+</head>
+<body>
+  <header><a class="brand" href="index.html">Sledovátko</a><a class="back" href="index.html">Zpět do aplikace →</a></header>
+  <main>
+    <p class="eyebrow">Tvoje sbírka a tvůj účet</p>
+    <h1>Soukromí a ukládání dat</h1>
+    <p class="intro">Bez účtu máš sbírku uloženou v tomto prohlížeči. Přihlášením můžeš používat cloudovou synchronizaci mezi zařízeními. Tady najdeš, jaká data při tom aplikace používá.</p>
+    <p class="date">Aktualizováno 10. září 2026</p>
+    <section>
+      <h2>1. Data v tomto zařízení</h2>
+      <p>Sledovátko ukládá do úložiště prohlížeče tvoji knihovnu, poznámky, hodnocení, štítky, průběh sledování, historii hledání a nastavení rozhraní. U přihlášeného účtu udržuje také místní kopii sbírky a přihlašovací relaci, aby nebylo potřeba přihlašovat se po každém obnovení stránky.</p>
+      <p>Dočasné kopie údajů z katalogu a vybraných obrázků omezují opakované načítání. Základní veřejné soubory aplikace se mohou uložit pro offline otevření. Tato offline mezipaměť neukládá odpovědi přihlašování ani cloudovou knihovnu.</p>
+      <p>Vymazání dat webu odstraní místní uložená data. Anonymní režim nebo omezené úložiště mohou jejich uchování zkrátit či znemožnit. Důležitou sbírku si můžeš exportovat jako zálohu.</p>
+    </section>
+    <section>
+      <h2>2. Přihlášení přes Google nebo GitHub</h2>
+      <p>Při použití některého z nabízených poskytovatelů přihlášení Sledovátko prostřednictvím Supabase získá identifikátor účtu, e-mail a základní profilové údaje, které poskytovatel zpřístupní, například jméno nebo profilový obrázek. Slouží k rozpoznání účtu, jeho zobrazení v aplikaci a přiřazení správné sbírky.</p>
+      <p>Heslo ke Googlu nebo GitHubu zadáváš u daného poskytovatele; Sledovátko ho nedostává. Přihlášení přes Google nepožaduje přístup ke Gmailu, souborům na Disku Google ani kontaktům. Přihlašovací údaje a profil zpracovává služba Supabase Auth.</p>
+      <p>Tajný klíč přihlášení Google či GitHub je součástí serverového nastavení Supabase, nikoli veřejných souborů webu. V prohlížeči se ukládá relace potřebná pro přístup k tvému účtu; proto na sdíleném zařízení po použití zvol odhlášení.</p>
+    </section>
+    <section>
+      <h2>3. Cloudová sbírka</h2>
+      <p>Po přihlášení se do databáze Supabase synchronizují uložené tituly a jejich pořadí, označení zhlédnutí, hodnocení, poznámky, štítky, uložená hledání, zhlédnuté epizody a související údaje o filmech a seriálech. Tyto údaje umožňují pokračovat se stejnou sbírkou na dalším zařízení.</p>
+      <p>Cloudová knihovna je přiřazena k účtu. Databázová pravidla omezují přístup uživatelů na jejich vlastní knihovnu; aplikace ji automaticky nezveřejňuje ostatním uživatelům. Přenos místní sbírky hosta do účtu probíhá podle volby v rozhraní.</p>
+      <p>Samotné prohlížení bez účtu neodesílá místní sbírku do Supabase. Připojení ke katalogu a poskytovatelům obrázků však probíhá i bez přihlášení.</p>
+    </section>
+    <section>
+      <h2>4. Katalog, obrázky a externí služby</h2>
+      <p>Vyhledávací dotazy, požadavky na informace o titulech a obrázky se odesílají službě The Movie Database (TMDB). Připojení probíhá přímo z prohlížeče, takže poskytovatel obdrží také technické údaje spojení, například IP adresu. Stejně tak hosting GitHub Pages zpracovává požadavky na načtení samotného webu.</p>
+      <p>Náhled karty může načíst vložené video Vimeo už při najetí ukazatelem. Při otevření ukázky z YouTube se může načíst její náhledový obrázek. Videa, soundtracky a další externí odkazy využívají služby třetích stran; při jejich načtení se uplatní i pravidla těchto služeb.</p>
+      <p>Sledovátko nemá vlastní reklamní měření ani analytický sledovací skript. To neznamená, že připojení k poskytovateli přihlášení, hostingu nebo vloženého videa je bez jeho vlastního zpracování údajů.</p>
+      <p>Podrobnosti poskytovatelů najdeš v jejich zásadách soukromí:</p>
+      <ul>
+        <li><a href="https://policies.google.com/privacy?hl=cs" target="_blank" rel="noopener noreferrer">Google a YouTube</a> — přihlášení a videoobsah.</li>
+        <li><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub</a> — přihlášení a hosting webu.</li>
+        <li><a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a> — účty a cloudová databáze.</li>
+        <li><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener noreferrer">TMDB</a> — katalog a obrázky.</li>
+        <li><a href="https://vimeo.com/legal/privacy/policy" target="_blank" rel="noopener noreferrer">Vimeo</a> — vložená videa.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>5. Export, sdílení a odhlášení</h2>
+      <p>Funkce zálohy a přenosu vytváří kopii sbírky, která může obsahovat i tvoje poznámky a hodnocení. Přenosový soubor, kód, odkaz ani QR kód nejsou šifrovanou schránkou: kdo je získá, může přečíst jejich obsah. Hesla a přihlašovací relace nejsou součástí exportu knihovny.</p>
+      <p>Odhlášení ukončí relaci v tomto prohlížeči a aplikace se vrátí k místní sbírce hosta. <strong>Odhlášení ani vymazání dat prohlížeče nesmaže cloudový účet a jeho sbírku.</strong> Změny položek a poznámek v přihlášené sbírce se po úspěšné synchronizaci promítnou do cloudu.</p>
+      <p>Aktuální rozhraní nemá samostatnou funkci pro zrušení celého účtu. Dotazy k aplikaci a kontakt na projekt najdeš v <a href="terms.html">podmínkách používání</a>. Do veřejného hlášení nevkládej soukromé poznámky, přenosové kódy, hesla ani přihlašovací tokeny.</p>
+    </section>
+  </main>
+  <footer><a href="index.html">Otevřít Sledovátko</a><a href="terms.html">Podmínky používání</a></footer>
+</body>
+</html>
