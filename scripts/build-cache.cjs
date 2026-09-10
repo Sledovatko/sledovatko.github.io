@@ -28,7 +28,8 @@ self.addEventListener('fetch',event=>{
   if(request.method!=='GET'||url.origin!==self.location.origin)return;
   const base=new URL('./',self.location.href);
   if(request.mode==='navigate'){
-    event.respondWith(fetch(request).catch(async()=>await caches.match(new URL('index.html',base).href)||Response.error()));
+    const page=['index.html','privacy.html','terms.html'].find(file=>ASSETS.includes('./'+file)&&new URL(file,base).pathname===url.pathname);
+    event.respondWith(fetch(request).catch(async()=>await caches.match(new URL(page||'index.html',base).href)||await caches.match(new URL('index.html',base).href)||Response.error()));
     return;
   }
   if(!ASSETS.some(asset=>new URL(asset,base).href===url.href))return;
@@ -39,7 +40,7 @@ self.addEventListener('fetch',event=>{
 
 function build(root = appRoot, { stage = false } = {}) {
   root = path.resolve(root);
-  const staticFiles = ['index.html', 'manifest.webmanifest', ...assetFolders.flatMap(folder => walk(root, folder))];
+  const staticFiles = ['index.html', 'privacy.html', 'terms.html', 'manifest.webmanifest', ...assetFolders.flatMap(folder => walk(root, folder))];
   const assets = staticFiles.filter(file => /\.(?:html|webmanifest|js|css|svg|png)$/.test(file));
   const hash = crypto.createHash('sha256');
   // Include names and the worker template so renamed files or worker changes
