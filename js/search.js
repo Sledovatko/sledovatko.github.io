@@ -25,15 +25,37 @@ Object.assign(App, {
     page.querySelector('#filter-toggle').onclick=()=>this.showSearchFilters();
     page.querySelector('#search-sort').onclick=()=>this.showSearchSort();
     this.renderActiveFilters();
+    if(!st.query.trim()&&!this._hasSearchFilters(st.filters))return this._doSearch('');
     if(st.loaded){this.renderSearchResults();return;}
-    if(st.query.trim()||Object.values(st.filters).some(v=>v&&v!=='all'))return this._doSearch(st.query);
-    this.renderSearchEmpty();
+    return this._doSearch(st.query);
+  },
+  _hasSearchFilters(filters=this._searchState.filters){
+    return ['movie','tv'].includes(filters.typeFilter)||['genreId','yearFrom','yearTo','minRating'].some(key=>!!filters[key]);
   },
   renderSearchEmpty(){
     const res=document.getElementById('search-results');if(!res)return;
-    const saved=Storage.getSavedSearches(),recent=Storage.getHistory();
-    res.innerHTML=`<div class="search-empty"><h2>Najdi svůj další oblíbený film</h2><p>Hledej podle názvu, nebo objevuj pomocí filtrů.</p>${saved.length?'<h3>Uložená hledání</h3>'+saved.map(q=>`<button class="history-query" data-query="${escHtml(q)}">★ ${escHtml(q)}</button>`).join(''):''}${recent.length?'<h3>Nedávná hledání</h3>'+recent.map(q=>`<button class="history-query" data-query="${escHtml(q)}">${escHtml(q)}</button>`).join(''):''}</div>`;
+    const saved=Storage.getSavedSearches(),recent=Storage.getHistory().filter(q=>!saved.includes(q));
+    res.innerHTML=`<div class="search-empty"><h2>Najdi svůj další oblíbený film</h2><p>Hledej podle názvu, nebo objevuj pomocí filtrů.</p>${saved.length?'<h3>Uložená hledání</h3><div class="saved-search-list">'+saved.map(q=>`<div class="saved-search-chip"><button type="button" class="history-query saved-search-query" data-query="${escHtml(q)}" aria-label="Hledat: ${escHtml(q)}">★ ${escHtml(q)}</button><button type="button" class="saved-search-remove" data-remove-saved-query="${escHtml(q)}" aria-label="Odebrat uložené hledání: ${escHtml(q)}" title="Odebrat uložené hledání">${icon('close')}</button></div>`).join('')+'</div>':''}${recent.length?'<h3>Nedávná hledání</h3>'+recent.map(q=>`<button type="button" class="history-query" data-query="${escHtml(q)}">${escHtml(q)}</button>`).join(''):''}</div>`;
     res.querySelectorAll('[data-query]').forEach(b=>b.onclick=()=>{this._searchState.query=b.dataset.query;this._searchState.loaded=false;this.renderSearch();});
+    res.querySelectorAll('[data-remove-saved-query]').forEach(b=>b.onclick=event=>{
+      event.stopPropagation();
+      const index=saved.indexOf(b.dataset.removeSavedQuery);
+      if(!this._setSavedSearch(b.dataset.removeSavedQuery,false))return;
+      this.renderSearchEmpty();
+      const remaining=res.querySelectorAll('[data-remove-saved-query]');
+      (remaining[Math.min(index,remaining.length-1)]||document.getElementById('search-input'))?.focus();
+    });
+  },
+  _setSavedSearch(query,save){
+    const value=save?String(query).trim():String(query);
+    if(!value.trim())return false;
+    try{
+      // Desired state is explicit, so a stale/double remove can never save it again.
+      if(Storage.getSavedSearches().includes(value)===save)return true;
+      Storage.toggleSavedSearch(value);
+    }catch{return false;}
+    showToast(save?'Hledání uloženo.':'Odebráno z uložených hledání.');
+    return true;
   },
   renderActiveFilters(){
     const box=document.getElementById('active-filters');if(!box)return;
@@ -75,9 +97,14 @@ Object.assign(App, {
   async _doSearch(query,more=false){
     if(this.currentScreen!=='search')return;
     const st=this._searchState,res=document.getElementById('search-results');if(!res)return;
-    this._searchController?.abort();const controller=new AbortController();this._searchController=controller;
+    this._searchController?.abort();this._searchController=null;
     const seq=++this._searchSeq;st.query=query;
     const filters={...st.filters};
+    if(!query.trim()&&!this._hasSearchFilters(filters)){
+      st.query='';st.items=[];st.pages={};st.loaded=false;st.partialError=false;
+      this.renderSearchEmpty();this.saveRoute();return;
+    }
+    const controller=new AbortController();this._searchController=controller;
     if(!more){st.items=[];st.pages={};st.loaded=false;res.innerHTML=spinner('Hledám…');}
     else {const b=res.querySelector('#load-more');if(b){b.disabled=true;b.textContent='Načítám…';}}
     try {
@@ -108,14 +135,17 @@ Object.assign(App, {
   },
   renderSearchResults(){
     const res=document.getElementById('search-results');if(!res)return;
-    const st=this._searchState,items=this._sortMovies(st.items||[],st.sortBy,st.query);
+    const st=this._searchState;
+    if(!st.query.trim()&&!this._hasSearchFilters(st.filters)){this.renderSearchEmpty();return;}
+    const items=this._sortMovies(st.items||[],st.sortBy,st.query);
     const more=Object.values(st.pages||{}).some(p=>!p.done)||st.partialError;
-    res.innerHTML=`<div class="results-summary"><span>Zobrazeno ${items.length} titulů</span>${st.query?`<button class="btn btn--ghost btn--sm" id="save-query">${Storage.getSavedSearches().includes(st.query)?'★ Uložené hledání':'☆ Uložit hledání'}</button>`:''}</div>
+    const savedQuery=st.query.trim(),querySaved=Storage.getSavedSearches().includes(savedQuery);
+    res.innerHTML=`<div class="results-summary"><span>Zobrazeno ${items.length} titulů</span>${savedQuery?`<button type="button" class="btn btn--ghost btn--sm" id="save-query" aria-label="${querySaved?'Odebrat uložené hledání':'Uložit hledání'}: ${escHtml(savedQuery)}">${querySaved?icon('close')+' Odebrat uložené hledání':'☆ Uložit hledání'}</button>`:''}</div>
       ${st.partialError?'<p class="inline-notice">Část výsledků se nepodařilo načíst. Dalším načtením to zkusíme znovu.</p>':''}
       ${items.length?`<div class="movie-grid" id="search-grid">${items.map(m=>movieCard(m,{highlight:st.query})).join('')}</div>`:`<div class="empty-state"><h2>${more?'Zatím žádná shoda':'Žádné výsledky'}</h2><p>${more?'Zkus další stránku nebo uprav filtry.':'Zkus jiný název nebo méně filtrů.'}</p></div>`}
       ${more?'<div class="load-more-wrap"><button class="btn btn--primary" id="load-more">Načíst další</button></div>':''}`;
     attachCardEvents(res);
     res.querySelector('#load-more')?.addEventListener('click',()=>this._doSearch(st.query,true));
-    res.querySelector('#save-query')?.addEventListener('click',()=>{Storage.toggleSavedSearch(st.query);this.renderSearchResults();});
+    res.querySelector('#save-query')?.addEventListener('click',()=>{if(this._setSavedSearch(savedQuery,!querySaved))this.renderSearchResults();});
   }
 });

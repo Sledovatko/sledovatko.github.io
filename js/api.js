@@ -277,7 +277,7 @@ const API = (() => {
 
     async getMovieDetails(movieId, options = {}) {
       const data = await get(`/movie/${movieId}?language=cs-CZ`, options);
-      return { runtime: data.runtime || 0 };
+      return { runtime: data.runtime || 0, genreIds: Array.isArray(data.genres) ? data.genres.map(g=>g.id).filter(Number.isSafeInteger) : null };
     },
 
     // TV a filmy mohou mít stejné číselné ID. Proto se pro seriály musí vždy
@@ -339,9 +339,10 @@ const API = (() => {
     },
 
     // One request per media type and page, with accurate pagination and cancellation.
-    async searchPage(query, { yearFrom, yearTo, genreId, minRating, searchTV = false, page = 1, signal, maxRuntime, noHorror } = {}) {
+    async searchPage(query, { yearFrom, yearTo, genreId, minRating, searchTV = false, page = 1, signal, maxRuntime, noHorror, excludedGenres = [], releasedBefore } = {}) {
       const type = searchTV ? 'tv' : 'movie';
       const params = new URLSearchParams({ language: 'cs-CZ', page: String(page), include_adult: 'false' });
+      const excluded = [...new Set([...(Array.isArray(excludedGenres)?excludedGenres:[]),...(noHorror?[27]:[])].map(Number).filter(id=>Number.isSafeInteger(id)&&id>0))];
       const searching = !!query.trim();
       if (searching) params.set('query', query.trim());
       else {
@@ -351,12 +352,14 @@ const API = (() => {
         if (yearTo) params.set(date + '.lte', yearTo + '-12-31');
         if (genreId) params.set('with_genres', genreId);
         if (minRating) {params.set('vote_average.gte', minRating);params.set('vote_count.gte', 50);}
-        if (maxRuntime) params.set('with_runtime.lte', maxRuntime);
-        if (noHorror) params.set('without_genres', 27);
+        if (maxRuntime) { params.set('with_runtime.gte', 1); params.set('with_runtime.lte', maxRuntime); }
+        if (excluded.length) params.set('without_genres', excluded.join(','));
+        if (releasedBefore && /^\d{4}-\d{2}-\d{2}$/.test(releasedBefore)) params.set(date + '.lte', releasedBefore);
       }
       const data = await get('/' + (searching ? 'search/' : 'discover/') + type + '?' + params, { signal });
       let items = (data.results || []).map(j => parseMovie(j, type));
       if (searching) items = items.filter(m => (!yearFrom || +m.year >= yearFrom) && (!yearTo || +m.year <= yearTo) && (!minRating || m.rating >= minRating) && (!genreId || m.genreIds.includes(+genreId)));
+      if (excluded.length) items = items.filter(m=>!m.genreIds.some(id=>excluded.includes(id)));
       return {items, page, totalPages: Math.min(500, data.total_pages || 0), totalResults: data.total_results || 0};
     },
     async searchMovies(query, options = {}) { return (await this.searchPage(query, options)).items; },

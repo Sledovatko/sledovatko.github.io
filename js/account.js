@@ -10,7 +10,7 @@ function createAccount(deps = {}) {
   let generation = 0, timer = null, busy = null, suspended = false, initialized = false;
   let localRevision = 0, dirty = false, edits = 0, remoteConflict = null;
   let client = deps.client || null;
-  const state = { configured: false, user: null, status: 'guest', message: '', ready: false, recovery: false, githubEnabled: false, emailEnabled: true };
+  const state = { configured: false, user: null, status: 'guest', message: '', ready: false, recovery: false, googleEnabled: false, githubEnabled: false, emailEnabled: true, manualLinkingEnabled: false };
   const read = key => { try { return JSON.parse(disk.getItem(key) || 'null'); } catch { return null; } };
   const write = (key, value) => disk.setItem(key, JSON.stringify(value));
   const normalize = snapshot => data.mergeCloudSnapshots(snapshot, data.emptyCloudSnapshot());
@@ -128,7 +128,12 @@ function createAccount(deps = {}) {
   }
   async function acceptSession(session) {
     const next = session?.user || null;
-    if (state.user?.id === next?.id && state.ready) return;
+    if (state.user?.id === next?.id && state.ready) {
+      // A refreshed session can carry newly linked identities for the same user.
+      // Update the profile without replacing the library or losing pending edits.
+      if (next) { state.user = next; doc.dispatchEvent(new CustomEvent('accountchange')); }
+      return;
+    }
     generation++; busy = null; clearTimer(); remoteConflict = null;
     // The old library is still owned/editable here. Complete synchronous UI
     // drafts before closing dialogs, taking a rollback, or installing next's data.
@@ -240,12 +245,46 @@ function createAccount(deps = {}) {
     // A completed, signed-out account needs no local replica.
     disk.removeItem(CACHE); disk.removeItem('wm_sync_rollback');
   }
+  async function signInOAuth(provider) {
+    if (!state.configured || !client || !['google', 'github'].includes(provider) || state[provider + 'Enabled'] !== true) {
+      throw { code: 'provider_disabled' };
+    }
+    if (!online()) throw { code: 'offline', message: 'offline' };
+    // Preserve a note still waiting for its debounce before leaving the page.
+    flushPendingNotes();
+    const page = new URL(win.location.href);
+    const redirectTo = new URL(page.pathname, page.origin).href + '?auth=oauth';
+    const options = { redirectTo };
+    // An account chooser avoids silently opening another person's Google session
+    // on shared devices. No Google API access or offline provider token is requested.
+    if (provider === 'google') options.queryParams = { prompt: 'select_account' };
+    const result = await client.auth.signInWithOAuth({ provider, options });
+    if (result.error) throw result.error;
+    return result;
+  }
+  async function linkGoogle() {
+    if (!state.configured || !client || !state.googleEnabled || !state.manualLinkingEnabled) throw { code: 'manual_linking_disabled' };
+    if (!state.user || !state.ready || !own()) throw { code: 'session_not_found' };
+    const userId = state.user.id;
+    flushPendingNotes();
+    // The existing library must be durable before a provider redirect. Identity
+    // linking is explicit and stays attached to this authenticated Supabase user.
+    if (!(await sync()) || !state.ready || state.user?.id !== userId || !own()) throw { code: 'library_not_synced' };
+    const page = new URL(win.location.href);
+    const result = await client.auth.linkIdentity({ provider: 'google', options: {
+      redirectTo: new URL(page.pathname, page.origin).href + '?auth=oauth', queryParams: { prompt: 'select_account' }
+    } });
+    if (result.error) throw result.error;
+    return result;
+  }
   async function init() {
     if (initialized) return;
     initialized = true;
     const config = deps.config || win.SLEDOVATKO_AUTH || {};
+    state.googleEnabled = config.googleEnabled === true;
     state.githubEnabled = config.githubEnabled === true;
     state.emailEnabled = config.emailEnabled !== false;
+    state.manualLinkingEnabled = config.manualLinkingEnabled === true;
     state.configured = !!(client || (/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(config.url || '') && config.publishableKey));
     if (!state.configured) { await acceptSession(null); return; }
     if (!client) {
@@ -284,7 +323,7 @@ function createAccount(deps = {}) {
     client.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') state.recovery = true;
       // Do not await Supabase calls inside its auth lock/callback.
-      if (!booting && ['SIGNED_IN', 'SIGNED_OUT', 'PASSWORD_RECOVERY'].includes(event)) {
+      if (!booting && ['SIGNED_IN', 'SIGNED_OUT', 'PASSWORD_RECOVERY', 'USER_UPDATED'].includes(event)) {
         setTimeout(() => { acceptSession(session).then(() => {
           if (state.recovery && typeof openAccount === 'function') openAccount('recovery');
         }); }, 0);
@@ -321,7 +360,7 @@ function createAccount(deps = {}) {
     } finally { booting = false; }
   }
   Object.assign(state, {
-    init, sync, acceptSession, resolveConflict, signOut, importGuest, hasGuest, getGuestSnapshot,
+    init, sync, acceptSession, resolveConflict, signOut, signInOAuth, linkGoogle, importGuest, hasGuest, getGuestSnapshot,
     getLocalSnapshot: () => data.getCloudSnapshot(),
     canEdit: () => !state.configured || (state.ready && (!state.user ? !disk.getItem(OWNER) : own())),
     debug: () => ({ revision: localRevision, dirty, edits, generation }),

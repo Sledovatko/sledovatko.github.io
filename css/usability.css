@@ -1,0 +1,61 @@
+/* Keep touch interactions independent of hover decoration and browser history. */
+html,body,#app,#screen{overscroll-behavior-x:none}
+.category__row,.gallery,.mood-chips,.labels-row{overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom}
+.card-control__disc{display:contents}
+.library-page>.page-heading:has(.library-menu[open]){z-index:30}
+.detail-overlay .detail-footer .btn{position:relative;overflow:hidden;isolation:isolate}
+.detail-overlay .detail-footer .btn::after{border-radius:inherit;pointer-events:none}
+
+.saved-search-list{display:flex;flex-wrap:wrap;gap:10px}
+.saved-search-chip{display:inline-flex;align-items:stretch;min-width:0;max-width:100%;border:1px solid var(--edge);border-radius:16px;background:var(--glass);overflow:hidden}
+.saved-search-chip .saved-search-query{min-width:0;min-height:44px;margin:0;border:0;border-radius:0;box-shadow:none;white-space:normal;text-align:left;overflow-wrap:anywhere}
+.saved-search-remove{width:44px;min-width:44px;min-height:44px;display:grid;place-items:center;border:0;border-left:1px solid var(--edge);color:var(--text2);background:#ffffff08;font-size:21px}
+.saved-search-query:focus-visible,.saved-search-remove:focus-visible{outline-offset:-3px}
+@media(hover:hover) and (pointer:fine){.saved-search-remove:hover{color:#ffb3a7;background:#ff604a20}}
+.tonight-genres{margin:6px 0 20px;border:1px solid var(--edge);border-radius:16px;background:#ffffff04}
+.tonight-genres-summary{padding:12px 14px;min-height:48px;cursor:pointer;font-weight:600}
+.tonight-genres-count{display:inline-block;margin-left:8px;font-size:12px;color:var(--accent)}
+.tonight-genre-options{margin:0;padding:0 14px 14px;border:0;min-width:0}
+.tonight-genre-chips{display:flex;flex-wrap:wrap;gap:8px}
+.tonight-genre-chip{display:flex;align-items:center;gap:9px;min-height:44px;padding:8px 12px;border:1px solid var(--edge);border-radius:13px;font-size:13px;cursor:pointer}
+.tonight-genre-chip input{width:20px;height:20px;flex-shrink:0;margin:0;accent-color:var(--accent)}
+.tonight-genre-chip:has(input:checked){border-color:#ffc33da0;background:#ffc33d18;color:#ffe4a2}
+[data-theme=light] .tonight-genre-chip:has(input:checked){color:#624204;background:#ffc33d29;border-color:#a8781b}
+.tonight-filter-help,.tonight-filter-status{font-size:13px;color:var(--text2);line-height:1.6;margin:10px 0}
+.tonight-genres>.tonight-filter-help,.tonight-genres>.tonight-filter-status{margin-inline:14px}
+
+@media(max-width:600px){
+  .library-page .movie-grid,.library-page .movie-grid.favorites-grid,.library-page .cal-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 9px}
+  .library-page .cal-row>div{width:auto!important;min-width:0}
+  .library-page .cal-row .movie-card{width:100%;min-width:0}
+  .library-page .movie-card__title{font-size:12px;line-height:1.3;min-height:32px;max-height:32px;margin-top:7px}
+  .library-page .movie-card__meta{display:grid;grid-template-columns:auto 1fr;gap:1px 4px;font-size:10px;align-items:center}
+  .library-page .movie-card__runtime{grid-row:2;grid-column:1/-1;font-size:10px;white-space:normal}
+  .library-page .movie-card__rating{font-size:10px;text-align:right}
+  .library-page .movie-card__series-progress-row{font-size:10px}
+  .library-page .media-kind{font-size:9px}
+  /* The disc and its check mark share one box; asymmetric transparent borders
+     on the touch target can no longer displace the saved background. */
+  :is(.search-page,.library-page) .movie-card :is(.btn--quick-add,.fav-ctx-btn){width:44px;height:44px;min-width:44px;right:0;padding:0;border:0!important;background:none!important;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+  :is(.search-page,.library-page) .movie-card .btn--quick-add{top:0}
+  .library-page .movie-card .fav-ctx-btn{bottom:0}
+  :is(.search-page,.library-page) .movie-card :is(.btn--quick-add,.fav-ctx-btn)::after{content:none}
+  :is(.search-page,.library-page) .card-control__disc{position:absolute;display:grid;place-items:center;right:2px;top:2px;width:28px;height:28px;border:1px solid #fff9;border-radius:50%;background:radial-gradient(circle at 30% 0%,#ffffff45,transparent 65%),linear-gradient(150deg,#303237cc,#0d0e10df);box-shadow:inset 0 1px 2px #fff6,0 2px 6px #0005;color:#fff}
+  :is(.search-page,.library-page) .fav-ctx-btn .card-control__disc{top:12px}
+  :is(.search-page,.library-page) .btn--quick-add.active .card-control__disc{background:linear-gradient(145deg,#ffe6a5,#d5a02e);border-color:#ffe7ad;color:#241a09;box-shadow:inset 0 1px 2px #fff8,0 0 10px #ffc33d40}
+  :is(.search-page,.library-page) .card-control__disc svg{display:block;width:16px;height:16px;margin:0}
+}
+@media(hover:none),(any-pointer:coarse){
+  .category__arrow,.gallery-arrow{display:none!important}
+}
+@media(hover:none),(pointer:coarse){
+  .movie-card:hover .movie-card__poster-wrap::before{opacity:0}
+  .movie-card:hover .movie-card__hover-overlay{opacity:0;pointer-events:none}
+  .movie-card:hover .movie-card__trailer-hint{opacity:0;pointer-events:none}
+}
+html[data-input=touch] .movie-card:hover{transform:none!important}
+html[data-input=touch] .movie-card:hover .movie-card__poster{transform:none!important;filter:none}
+html[data-input=touch] .movie-card:hover .movie-card__poster-wrap::before{opacity:0}
+html[data-input=touch] .category__arrow,html[data-input=touch] .gallery-arrow{display:none!important}
+html[data-input=touch] .btn:hover::after{left:-130%}
+@media(prefers-reduced-motion:reduce){.detail-footer .btn::after{content:none}}
