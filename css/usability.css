@@ -67,3 +67,45 @@ html[data-input=touch] .movie-card:hover .movie-card__poster-wrap::before{opacit
 html[data-input=touch] .category__arrow,html[data-input=touch] .gallery-arrow{display:none!important}
 html[data-input=touch] .btn:hover::after{left:-130%}
 @media(prefers-reduced-motion:reduce){.detail-footer .btn::after{content:none}}
+
+/* Let desktop libraries fill their window, including 4K at different OS scales.
+   Scale the cards and type together; keep sparse grids in fixed-size tracks. */
+@media(min-width:1280px){
+  :root{--card-w:clamp(180px,8vw,300px);--desktop-gap:clamp(20px,1vw,36px);--desktop-title:clamp(14px,.52vw,20px);--desktop-meta:clamp(12px,.42vw,16px)}
+  #app{max-width:none}
+  .home-page,.search-page,.library-page,.tonight-page{max-width:none;width:100%;padding-inline:clamp(24px,2.5vw,96px)}
+  .page-heading{padding-block:clamp(28px,1.3vw,48px)}
+  .page-heading h1,.home-logo{font-size:clamp(32px,1.5vw,52px)!important}
+  .home-page h2,.category__title,#continue-slot .category__title{font-size:clamp(22px,.85vw,32px)}
+  .category__row{gap:var(--desktop-gap)}
+  .search-page .movie-grid,.library-page .movie-grid{grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr));gap:clamp(24px,1.2vw,44px) var(--desktop-gap)}
+  .library-page .cal-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr));gap:24px var(--desktop-gap)}
+  .library-page .cal-row>div{width:auto!important;min-width:0}
+  .library-page .cal-row .movie-card{width:100%}
+  .movie-card__title{font-size:var(--desktop-title);line-height:1.35;min-height:2.7em;max-height:2.7em}
+  .movie-card__meta,.movie-card__rating,.movie-card__runtime{font-size:var(--desktop-meta)}
+  .search-page .movie-card__title{font-size:var(--desktop-title);min-height:0;max-height:2.7em;right:52px;padding-right:0;bottom:calc(20px + 2.8 * var(--desktop-meta))}
+  .search-page .movie-card__meta{bottom:10px}
+  .search-page .movie-card__rating,.search-page .movie-card__runtime{font-size:var(--desktop-meta)}
+  .search-page .movie-card .fav-ctx-btn{bottom:calc(20px + 2.8 * var(--desktop-meta))}
+  .search-page .media-kind{font-size:clamp(10px,.36vw,14px)}
+  #continue-slot .movie-card{width:var(--card-w)!important;height:auto;aspect-ratio:5/8}
+  #continue-slot .movie-card__title{font-size:var(--desktop-title);max-height:2.6em;bottom:calc(39px + var(--desktop-meta))}
+  #continue-slot .movie-card__series-progress-row,#continue-slot .next-episode{font-size:var(--desktop-meta);line-height:1.2}
+  #continue-slot .movie-card__series-progress{bottom:calc(16px + var(--desktop-meta))}
+  .tonight-hero{min-height:clamp(320px,18vw,640px)}
+  .tonight-copy{padding:clamp(24px,1.4vw,52px)}
+  .tonight-title{max-width:22ch;font-size:clamp(28px,1.25vw,46px)}
+  .tonight-copy>p{font-size:clamp(13px,.45vw,17px)}
+  .home-media-tabs{max-width:clamp(400px,17vw,600px)}
+  .home-media-tabs button,.mood-chip{font-size:clamp(14px,.45vw,17px)}
+  .mood-chips{flex-wrap:wrap;overflow:visible}
+  .search-input-wrap{min-height:clamp(54px,2vw,72px)}
+  .search-input-wrap input{font-size:clamp(16px,.55vw,21px)}
+  .search-empty{max-width:70ch}
+  .tonight-page>.glass-panel{max-width:1100px}
+  .tonight-picks{max-width:calc(3 * var(--card-w) + 2 * var(--desktop-gap));gap:var(--desktop-gap)}
+  #bottom-nav{max-width:clamp(420px,17vw,640px)}
+  .nav-btn{font-size:clamp(13px,.45vw,17px);min-height:clamp(74px,2.5vw,96px)}
+  .nav-btn svg{width:clamp(26px,.9vw,34px);height:clamp(26px,.9vw,34px)}
+}
