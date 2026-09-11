@@ -148,3 +148,14 @@ body [contenteditable]:not([contenteditable=false]) *{
   .nav-btn{font-size:clamp(13px,.45vw,17px);min-height:clamp(74px,2.5vw,96px)}
   .nav-btn svg{width:clamp(26px,.9vw,34px);height:clamp(26px,.9vw,34px)}
 }
+
+/* Similar titles live inside a narrower dialog, not the full catalog. */
+.detail-body .similar-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));gap:24px 18px;padding:8px 0 20px}
+.similar-grid .movie-card{width:100%;min-width:0}
+.similar-grid .movie-card__meta{flex-wrap:wrap;row-gap:4px}
+.similar-grid .movie-card__title{overflow-wrap:anywhere}
+@media(max-width:480px){
+  .detail-body .similar-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 14px}
+}
+
+.category-load-more{flex:0 0 140px;align-self:center;white-space:normal;min-height:48px;margin:8px}

@@ -36,10 +36,8 @@ body::before{
 }
 body::after{
   z-index:-1;opacity:.42;
-  background:radial-gradient(1px 1px at 14% 18%,#ffdfa2 50%,transparent),
-    radial-gradient(1px 1px at 78% 12%,#a6d6e4 50%,transparent),
-    radial-gradient(1px 1px at 94% 65%,#ffdfa2 50%,transparent),
-    radial-gradient(1px 1px at 36% 85%,#e9c987 50%,transparent);
+  /* Keep the background smooth: pinpoint highlights resemble stuck pixels. */
+  background:none;
 }
 @keyframes fx-ambient{from{transform:translate3d(-2%,-1%,0) scale(1)}to{transform:translate3d(2%,3%,0) scale(1.08)}}
 
