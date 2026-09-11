@@ -6,7 +6,7 @@
     const screen = document.getElementById('screen');
     if (!screen || !window.matchMedia) return;
 
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const finePointer = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const passive = { passive: true };
     const properties = ['--fx-x', '--fx-y', '--fx-rx', '--fx-ry'];
@@ -32,7 +32,7 @@
     }
 
     function pointerAllowed() {
-      return finePointer.matches && !reducedMotion.matches && !document.hidden;
+      return (finePointer.matches || document.documentElement.dataset.input === 'mouse') && !reducedMotion.matches && !document.hidden;
     }
 
     function paintPointer() {

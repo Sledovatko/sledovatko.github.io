@@ -3,6 +3,19 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class BoredGrid {
+  static capacity(width, height) {
+    const tile = width <= 600 ? 30 : 44;
+    return Math.max(1, Math.min(1600, Math.ceil(width / tile) * Math.ceil(height / (tile * 1.5))));
+  }
+
+  static layout(width, height, available) {
+    const count = Math.min(BoredGrid.capacity(width, height), available);
+    if (!count) return { cols: 0, rows: 0, total: 0 };
+    const cols = Math.max(1, Math.min(count, Math.round(Math.sqrt(count * width / Math.max(1, height) * 1.5))));
+    const rows = Math.max(1, Math.floor(count / cols));
+    return { cols, rows, total: cols * rows };
+  }
+
   constructor(canvas, movies, opts = {}) {
     this.canvas = canvas;
     this.ctx    = canvas.getContext('2d');
@@ -16,6 +29,11 @@ class BoredGrid {
     this.targetOp   = {};
     this.images     = {};
     this.loading    = new Set();
+    this._pendingImages = [];
+    this._imageRequests = 0;
+    this._dirty = true;
+    this._destroyed = false;
+    this._requested = opts.requestedCount || movies.length;
     this.hoveredIdx = -1;
 
     this.cellW = 1; this.cellH = 1;
@@ -44,6 +62,9 @@ class BoredGrid {
   }
 
   destroy() {
+    this._destroyed = true;
+    this._pendingImages = [];
+    clearTimeout(this._resizeTimer);
     cancelAnimationFrame(this._raf);
     this.canvas.removeEventListener('mousemove', this._onMove);
     this.canvas.removeEventListener('mouseleave', this._onLeave);
@@ -57,30 +78,57 @@ class BoredGrid {
 
   updateOpts(o) { this.opts = { ...this.opts, ...o }; }
 
+  setMovies(movies) {
+    this.movies = movies;
+    this.scales = {}; this.targetSc = {}; this.opacities = {}; this.targetOp = {};
+    this.hoveredIdx = -1;
+    this._setupGrid();
+  }
+
   _setupGrid() {
     const W = this.canvas.width  = this.canvas.offsetWidth;
     const H = this.canvas.height = this.canvas.offsetHeight;
     this._diag = Math.sqrt(W * W + H * H);
-    const T = 30;
-    this.cols = Math.max(8, Math.round(W / T));
-    this.rows = Math.max(4, Math.ceil(H / (T * 1.5)));
-    this.cellW = W / this.cols;
-    this.cellH = H / this.rows;
-    this.total = Math.min(this.cols * this.rows, this.movies.length);
+    Object.assign(this, BoredGrid.layout(W, H, this.movies.length));
+    this.cellW = W / Math.max(1, this.cols);
+    this.cellH = H / Math.max(1, this.rows);
+    this.canvas.dataset.titleCount = String(this.movies.length);
+    this.canvas.dataset.cellCount = String(this.total);
+    this.canvas.dataset.columns = String(this.cols);
+    this.canvas.dataset.rows = String(this.rows);
+    this.canvas.setAttribute('aria-label', `Filmová mozaika, ${this.movies.length} titulů`);
+    this._dirty = true;
     this._preload();
   }
 
   _preload() {
     for (let i = 0; i < this.total; i++) {
-      if (this.loading.has(i) || this.images[i]) continue;
-      const url = this.movies[i]?.posterUrl;
+      const movie = this.movies[i], key = movie?.imdbId;
+      if (this.loading.has(key) || this.images[key]) continue;
+      const url = movie?.posterUrl;
       if (!url) continue;
-      this.loading.add(i);
+      this.loading.add(key);
+      this._pendingImages.push({ key, url });
+    }
+    this._pumpImages();
+  }
+
+  _pumpImages() {
+    while (!this._destroyed && this._imageRequests < 8 && this._pendingImages.length) {
+      const { key, url } = this._pendingImages.shift();
+      this._imageRequests++;
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload  = () => { this.images[i] = img; };
-      img.onerror = () => { this.loading.delete(i); };
-      img.src = url;
+      const finish = loaded => {
+        this._imageRequests--;
+        if (this._destroyed) return;
+        if (loaded) this.images[key] = img;
+        this._dirty = true;
+        this._pumpImages();
+      };
+      img.onload = () => finish(true);
+      img.onerror = () => finish(false);
+      img.src = url.replace('/w342/', '/w185/');
     }
   }
 
@@ -88,11 +136,21 @@ class BoredGrid {
     this._onMove   = e => this._handleMove(e);
     this._onLeave  = () => this._handleLeave();
     this._onClick  = e => this._handleClick(e);
-    this._onTouchStart = e => { e.preventDefault(); this._syncTouch(e); };
-    this._onTouchMove  = e => { e.preventDefault(); this._syncTouch(e); };
-    this._onTouchEnd   = e => { const touch = e.changedTouches?.[0]; if (touch) this._handleClick(touch); this._handleLeave(); };
-    this._onTouchCancel = () => this._handleLeave();
-    this._onResize = () => this._setupGrid();
+    this._onTouchStart = e => { if (e.defaultPrevented || e.touches.length !== 1) this._touchCanceled = true; if (e.cancelable) e.preventDefault(); if (!this._touchCanceled) this._syncTouch(e); };
+    this._onTouchMove  = e => { if (e.touches.length !== 1) this._touchCanceled = true; if (e.cancelable) e.preventDefault(); if (!this._touchCanceled) this._syncTouch(e); };
+    this._onTouchEnd   = e => { const touch = e.changedTouches?.[0]; if (touch && !this._touchCanceled && !e.touches.length && !e.defaultPrevented) this._handleClick(touch); if (!e.touches.length) this._touchCanceled = false; this._handleLeave(); };
+    this._onTouchCancel = e => { this._touchCanceled = !!e.touches.length; this._handleLeave(); };
+    this._onResize = () => {
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        this._setupGrid();
+        const needed = BoredGrid.capacity(this.canvas.offsetWidth, this.canvas.offsetHeight);
+        if (needed > this.movies.length && needed > this._requested) {
+          this._requested = needed;
+          this.opts.onNeedMore?.(needed);
+        }
+      }, 200);
+    };
     this.canvas.addEventListener('mousemove',  this._onMove,  { passive: true });
     this.canvas.addEventListener('mouseleave', this._onLeave, { passive: true });
     this.canvas.addEventListener('click',      this._onClick);
@@ -104,6 +162,7 @@ class BoredGrid {
   }
 
   _syncTouch(e) {
+    this._dirty = true;
     const t = e.touches[0];
     if (!t) return;
     const rect = this.canvas.getBoundingClientRect();
@@ -162,6 +221,7 @@ class BoredGrid {
   _prevHot = -1;
 
   _handleMove(e) {
+    this._dirty = true;
     const rect = this.canvas.getBoundingClientRect();
     this.mouse.x = e.clientX - rect.left;
     this.mouse.y = e.clientY - rect.top;
@@ -185,6 +245,7 @@ class BoredGrid {
   }
 
   _handleLeave() {
+    this._dirty = true;
     this.mouse = { x: -9999, y: -9999 };
     this.hoveredIdx = -1; this._prevHot = -1;
     for (const i in this.targetSc)  this.targetSc[i]  = this.MIN_SCALE;
@@ -200,9 +261,11 @@ class BoredGrid {
   }
 
   _tick() {
+    let changed = false;
     for (const i in this.scales) {
       const t = this.targetSc[i] ?? this.MIN_SCALE;
       const d = t - this.scales[i];
+      if (d !== 0) changed = true;
       if (Math.abs(d) < 0.003) {
         this.scales[i] = t;
         if (t <= this.MIN_SCALE + 0.002) { delete this.scales[i]; delete this.targetSc[i]; }
@@ -211,11 +274,13 @@ class BoredGrid {
     for (const i in this.opacities) {
       const t = this.targetOp[i] ?? this.OP_IDLE;
       const d = t - this.opacities[i];
+      if (d !== 0) changed = true;
       if (Math.abs(d) < 0.004) {
         this.opacities[i] = t;
         if (Math.abs(t - this.OP_IDLE) < 0.01) { delete this.opacities[i]; delete this.targetOp[i]; }
       } else { this.opacities[i] += d * this.EASING; }
     }
+    return changed;
   }
 
   _drawTile(i) {
@@ -236,7 +301,7 @@ class BoredGrid {
     ctx.clip();
     ctx.globalAlpha = op;
 
-    const img = this.images[i];
+    const img = this.images[this.movies[i]?.imdbId];
     if (img && img.complete) {
       ctx.drawImage(img, 0, 0, this.cellW, this.cellH);
     } else {
@@ -300,8 +365,8 @@ class BoredGrid {
   }
 
   _loop() {
-    this._tick();
-    this._draw();
+    const changing = this._tick();
+    if (this._dirty || changing) { this._draw(); this._dirty = false; }
     this._raf = requestAnimationFrame(() => this._loop());
   }
 }

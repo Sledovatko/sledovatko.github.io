@@ -8,6 +8,7 @@ const API = (() => {
   let _token = '';
   const _genreCache = {};
   const memoryCache = new Map();
+  const boredPools = new Map();
   const CACHE_KEY = 'wm_api_cache_v1';
   // Reserve localStorage for the library. Raw image galleries can be hundreds
   // of kilobytes each and never belong in the persistent metadata cache.
@@ -313,6 +314,7 @@ const API = (() => {
         numberOfEpisodes: data.number_of_episodes || 0,
         episodeRunTime: data.episode_run_time || [],
         lastEpisodeRuntime: data.last_episode_to_air?.runtime || 0,
+        genreIds: (data.genres || []).map(g => g.id),
         status: data.status || '',
         seasons,
       };
@@ -364,33 +366,60 @@ const API = (() => {
     },
     async searchMovies(query, options = {}) { return (await this.searchPage(query, options)).items; },
 
-    async getBoredMovies({ genreId, decade } = {}) {
-      let ep = '/discover/movie?sort_by=popularity.desc';
+    async getBoredMovies({ genreId, decade, count = 240, signal, onProgress } = {}) {
+      const wanted = Math.max(1, Math.min(1600, Math.ceil(Number(count) || 240)));
+      const checkAbort = () => { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); };
+      checkAbort();
+      let ep = '/discover/movie?sort_by=popularity.desc&include_adult=false';
       if (genreId) ep += `&with_genres=${genreId}`;
       if (decade)  ep += `&primary_release_date.gte=${decade}-01-01&primary_release_date.lte=${parseInt(decade)+9}-12-31`;
-
-      const first = await get(ep + '&language=cs-CZ&page=1');
-      const count = Math.min(500, Math.max(1, first.total_pages || 1));
-      const allPages = Array.from({ length: count - 1 }, (_, i) => i + 2);
-      // Shuffle
-      for (let i = allPages.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allPages[i], allPages[j]] = [allPages[j], allPages[i]];
+      let pool = boredPools.get(ep);
+      const shuffle = values => {
+        for (let i = values.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [values[i], values[j]] = [values[j], values[i]];
+        }
+        return values;
+      };
+      const append = data => {
+        for (const item of data.results || []) {
+          const movie = parseMovie(item, 'movie');
+          if (movie.posterUrl && !pool.movies.has(movie.imdbId)) pool.movies.set(movie.imdbId, movie);
+        }
+      };
+      if (!pool || Date.now() - pool.created > 5 * 60000) {
+        const first = await get(ep + '&language=cs-CZ&page=1', { signal });
+        checkAbort();
+        const pages = Math.min(500, Math.max(1, first.total_pages || 1));
+        pool = { created: Date.now(), movies: new Map(), pages: shuffle(Array.from({ length: pages - 1 }, (_, i) => i + 2)), cursor: 0 };
+        append(first);
+        boredPools.delete(ep); boredPools.set(ep, pool);
+        while (boredPools.size > 4) boredPools.delete(boredPools.keys().next().value);
       }
-      const selected = [1, ...allPages.slice(0, 11)];
-      const all = [];
-      for (let i = 0; i < selected.length; i += 10) {
-        const batch = selected.slice(i, i + 10);
-        const results = await Promise.all(batch.map(p => fetchPage(ep, p)));
-        all.push(...results.flat());
+      const selected = new Map(shuffle([...pool.movies]).slice(0, wanted));
+      const publish = () => {
+        checkAbort();
+        for (const [key, movie] of pool.movies) { if (selected.size >= wanted) break; selected.set(key, movie); }
+        const movies = [...selected.values()];
+        onProgress?.(movies);
+        return movies;
+      };
+      publish();
+      // Fill larger viewports progressively. Bound concurrency and work even if
+      // a restrictive filter returns duplicates or titles without a poster.
+      let requested = 0;
+      const budget = Math.min(90, Math.ceil(wanted / 20) + 10);
+      while (selected.size < wanted && pool.cursor < pool.pages.length && requested < budget) {
+        checkAbort();
+        const batch = pool.pages.slice(pool.cursor, pool.cursor + Math.min(3, budget - requested, Math.ceil((wanted - selected.size) / 20)));
+        pool.cursor += batch.length; requested += batch.length;
+        const results = await Promise.allSettled(batch.map(page => get(ep + '&language=cs-CZ&page=' + page, { signal })));
+        checkAbort();
+        for (const result of results) if (result.status === 'fulfilled') append(result.value);
+        publish();
+        if (results.every(result => result.status === 'rejected')) break;
       }
-      const withPoster = all.filter(m => m.posterUrl);
-      // Shuffle result
-      for (let i = withPoster.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [withPoster[i], withPoster[j]] = [withPoster[j], withPoster[i]];
-      }
-      return withPoster;
+      return publish();
     },
 
     async getKinoVecer(sourceMovies, savedOnly = false) {
