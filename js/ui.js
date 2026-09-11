@@ -739,7 +739,7 @@ async function openMovieDetail(movie, opts = {}) {
   overlay.classList.add('detail-overlay');
   const actions = overlay.querySelector('.detail-actions');
   actions.classList.add('detail-footer');
-  overlay.querySelector('.modal').appendChild(actions);
+  overlay.querySelector('.detail-hero').after(actions);
   overlay.querySelector('.modal').setAttribute('aria-label', movie.title);
   overlay.querySelector('.detail-close').addEventListener('click', () => overlay.remove());
   if (!movie.overview) API.getOverview(movie.id,movie.mediaType||'movie').then(text=>{
