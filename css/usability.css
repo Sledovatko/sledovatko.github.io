@@ -208,3 +208,14 @@ body [contenteditable]:not([contenteditable=false]) *{
 }
 /* Keep selected genre chips readable in the light palette, too. */
 [data-theme=light] .mood-chip.active{background:linear-gradient(145deg,#ffe7b3,#f0cc7d)!important;color:#503707;border-color:#b88c37;box-shadow:inset 0 1px 0 #fff8,0 3px 12px #aa7c1918}
+
+/* Float over the catalog; fade only the glass, never the navigation labels. */
+#app{position:relative;--dock-height:76px}
+#screen{padding-bottom:calc(var(--dock-height) + 36px + env(safe-area-inset-bottom));scroll-padding-bottom:calc(var(--dock-height) + 36px + env(safe-area-inset-bottom))}
+#bottom-nav{position:absolute;left:0;right:0;bottom:0;z-index:40;isolation:isolate;background:transparent!important;border:0;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+#bottom-nav::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;border:1px solid #d3b97666;background:radial-gradient(ellipse at 20% 90%,#b7832526,transparent 60%),linear-gradient(180deg,#17171905 0%,#17171978 38%,#171719eb 76%,#171719 100%);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);mask-image:linear-gradient(180deg,transparent,#0006 24%,#000 62%);-webkit-mask-image:linear-gradient(180deg,transparent,#0006 24%,#000 62%);box-shadow:inset 0 -1px 1px #ddb45f70}
+#bottom-nav .nav-btn{background:transparent}
+#bottom-nav .nav-btn.active::before{background:radial-gradient(ellipse at 50% 85%,#ffc33d20,transparent 72%)}
+#bottom-nav .nav-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-5px;border-radius:24px}
+[data-theme=light] #bottom-nav::before{background:radial-gradient(ellipse at 20% 90%,#e6c27f26,transparent 60%),linear-gradient(180deg,#f5f1e805 0%,#f5f1e878 38%,#f5f1e8eb 76%,#f5f1e8 100%);border-color:#96743c66}
+@media(min-width:1280px){#app{--dock-height:clamp(76px,2.5vw,98px)}}
