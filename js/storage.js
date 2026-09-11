@@ -438,7 +438,6 @@ const Storage = (() => {
 const LABEL_DEFS = {
   red:    { color: '#E53935', emoji: '🔴', label: '🔴 Urgentní' },
   yellow: { color: '#FDD835', emoji: '🟡', label: '🟡 Někdy' },
-  blue:   { color: '#1E88E5', emoji: '🔵', label: '🔵 S partnerem' },
   orange: { color: '#F4511E', emoji: '🟠', label: '🟠 Akce na víkend' },
 };
 
