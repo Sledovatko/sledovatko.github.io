@@ -56,10 +56,13 @@ html[data-display-mode=standalone],html[data-display-mode=standalone] body{overs
 @media(hover:none),(any-pointer:coarse){
   .category__arrow,.gallery-arrow{display:none!important}
 }
+/* A connected touch screen must not hide controls from the mouse in use.
+   Availability and opacity remain owned by the row's scroll-position handler. */
+html[data-input=mouse] .category__arrow,html[data-input=mouse] .gallery-arrow{display:flex!important}
 @media(hover:none),(pointer:coarse){
-  .movie-card:hover .movie-card__poster-wrap::before{opacity:0}
-  .movie-card:hover .movie-card__hover-overlay{opacity:0;pointer-events:none}
-  .movie-card:hover .movie-card__trailer-hint{opacity:0;pointer-events:none}
+  html:not([data-input=mouse]) .movie-card:hover .movie-card__poster-wrap::before{opacity:0}
+  html:not([data-input=mouse]) .movie-card:hover .movie-card__hover-overlay{opacity:0;pointer-events:none}
+  html:not([data-input=mouse]) .movie-card:hover .movie-card__trailer-hint{opacity:0;pointer-events:none}
 }
 html[data-input=touch] .movie-card:hover{transform:none!important}
 html[data-input=touch] .movie-card:hover .movie-card__poster{transform:none!important;filter:none}
@@ -67,6 +70,41 @@ html[data-input=touch] .movie-card:hover .movie-card__poster-wrap::before{opacit
 html[data-input=touch] .category__arrow,html[data-input=touch] .gallery-arrow{display:none!important}
 html[data-input=touch] .btn:hover::after{left:-130%}
 @media(prefers-reduced-motion:reduce){.detail-footer .btn::after{content:none}}
+
+/* The input and buttons already supply glass; a second full-width opaque panel
+   behind them created a visible rectangle against the animated page backdrop. */
+.search-page .search-header{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+/* The installed app behaves as an app surface; editable text keeps its native
+   selection menu. Standalone legal pages are outside these application roots. */
+:where(#app,.modal-overlay){
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+:is(.movie-card,.hon-card,.gallery) img{-webkit-user-drag:none}
+body :is(input,textarea,[contenteditable]:not([contenteditable=false])),
+body [contenteditable]:not([contenteditable=false]) *{
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
+}
+
+.tonight-media-options{margin:0 0 20px;padding:0;border:0;min-width:0}
+.tonight-media-options legend{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:9px}
+.tonight-media-tabs{width:100%;max-width:560px}
+.tonight-media-tab{position:relative;display:flex;flex:1;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:44px;padding:9px 10px;border-radius:13px;font-size:14px;text-align:center;cursor:pointer}
+.tonight-media-tab input{position:absolute;width:1px;height:1px;opacity:0;margin:0;padding:0}
+.tonight-media-tab:has(input:checked){background:linear-gradient(145deg,#ffe5a2,#d9a432);box-shadow:inset 0 1px 2px #fff9,0 2px 10px #ffc23326;color:#291d07}
+.tonight-media-tab:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.tonight-page>.glass-panel,.tonight-picks{margin-inline:auto}
+.tonight-picks:has(>.movie-card:first-child:last-child){grid-template-columns:minmax(0,var(--card-w));max-width:var(--card-w)}
+.tonight-picks:has(>.movie-card:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr));max-width:calc(2 * var(--card-w) + var(--desktop-gap,18px))}
+#tonight-results>h2,#tonight-results>.tonight-filter-help{text-align:center}
+.bored-status:not([hidden]){position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:4;max-width:calc(100% - 32px);padding:8px 12px;border:1px solid var(--edge);border-radius:14px;background:#151719e6;box-shadow:0 4px 18px #0005;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#eee8dd;font-size:12px;line-height:1.4;text-align:center;pointer-events:none}
+
+@media(min-width:901px){
+  .discovery-extras{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .discovery-extras>#btn-kino{grid-column:auto;justify-self:stretch;display:flex;align-items:center;justify-content:flex-start;gap:14px;min-width:0;min-height:76px;margin:0;padding:18px;border-radius:20px;background:radial-gradient(circle at 0% 0%,#e9bc5642,transparent 24%),var(--glass)!important;font-size:inherit;font-weight:500;text-align:left}
+  .discovery-extras>#btn-kino::before{content:'🎞️';font-size:22px;flex-shrink:0}
+  .discovery-extras>#btn-kino::after{content:'→';position:static;inset:auto;width:auto;height:auto;margin-left:auto;background:none;transform:none;transition:none;flex-shrink:0}
+}
 
 /* Let desktop libraries fill their window, including 4K at different OS scales.
    Scale the cards and type together; keep sparse grids in fixed-size tracks. */
@@ -80,6 +118,7 @@ html[data-input=touch] .btn:hover::after{left:-130%}
   .category__row{gap:var(--desktop-gap)}
   .search-page .movie-grid,.library-page .movie-grid{grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr));gap:clamp(24px,1.2vw,44px) var(--desktop-gap)}
   .library-page .cal-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr));gap:24px var(--desktop-gap)}
+  .library-page .cal-row{overflow:visible}
   .library-page .cal-row>div{width:auto!important;min-width:0}
   .library-page .cal-row .movie-card{width:100%}
   .movie-card__title{font-size:var(--desktop-title);line-height:1.35;min-height:2.7em;max-height:2.7em}
