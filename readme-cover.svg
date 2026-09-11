@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="460" viewBox="0 0 1440 460" role="img" aria-labelledby="title desc">
+<title id="title">Sledovátko</title><desc id="desc">Filmový katalog a osobní sbírka. Zlatá typografie na tmavém pozadí s abstraktními filmovými kartami.</desc>
+<defs>
+<linearGradient id="bg" x2="1" y2="1"><stop stop-color="#201b12"/><stop offset=".55" stop-color="#0b0e10"/><stop offset="1" stop-color="#182023"/></linearGradient>
+<linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0c4"/><stop offset=".5" stop-color="#ffd16a"/><stop offset="1" stop-color="#bd8423"/></linearGradient>
+<linearGradient id="card" x2="1" y2="1"><stop stop-color="#41403a"/><stop offset=".5" stop-color="#191d20"/><stop offset="1" stop-color="#303238"/></linearGradient>
+</defs>
+<rect width="1440" height="460" rx="24" fill="url(#bg)"/>
+<rect x="1" y="1" width="1438" height="458" rx="23" fill="none" stroke="#bfa66a" stroke-opacity=".28"/>
+<path d="M72 92H142M72 366H1368" stroke="#ddb663" stroke-opacity=".5"/>
+<text x="160" y="98" fill="#c3bcae" font-family="Arial,sans-serif" font-size="14" letter-spacing="5">FILMY / SERIÁLY / VAŠE SBÍRKA</text>
+<text x="68" y="223" fill="url(#gold)" font-family="Arial,sans-serif" font-size="94" font-weight="700" letter-spacing="-4">Sledovátko</text>
+<text x="74" y="283" fill="#dedbd3" font-family="Arial,sans-serif" font-size="24">Váš další film začíná tady.</text>
+<text x="74" y="406" fill="#a8aaa8" font-family="Arial,sans-serif" font-size="13" letter-spacing="3">OBJEVOVAT  ·  UKLÁDAT  ·  SLEDOVAT</text>
+<g transform="translate(947 78) rotate(-12 88 134)"><rect width="176" height="264" rx="16" fill="#1d2529" stroke="#9ca7ac" stroke-opacity=".4"/><path d="M0 218L176 60V264H0Z" fill="#b18c42" fill-opacity=".2"/></g>
+<g transform="translate(1130 89) rotate(11 88 132)"><rect width="176" height="264" rx="16" fill="#293035" stroke="#b8c0be" stroke-opacity=".4"/><circle cx="115" cy="80" r="54" fill="#c0d5d9" fill-opacity=".09"/></g>
+<g transform="translate(1038 62)"><rect width="188" height="282" rx="18" fill="url(#card)" stroke="#dbbd7d" stroke-opacity=".8"/><path d="M0 205L188 46V282H0Z" fill="#eac467" fill-opacity=".12"/><circle cx="94" cy="128" r="36" fill="#161819" stroke="#edcb82" stroke-opacity=".7"/><path d="M85 111L110 128L85 145Z" fill="url(#gold)"/><path d="M24 238H137M24 251H96" stroke="#d7c9a9" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/></g>
+</svg>

@@ -1,47 +1,99 @@
-# Sledovátko
+<p align="center">
+  <img src="readme-cover.svg" alt="Sledovátko — filmy, seriály a váš osobní Šuplík" width="100%">
+</p>
 
-Statická aplikace pro GitHub Pages. Nepotřebuje vlastní aplikační server ani instalaci balíčků; při publikování se generuje verze offline cache.
+<p align="center">
+  <strong>Objevujte filmy. Ukládejte si tipy. Vyberte si, co sledovat.</strong>
+</p>
 
-Účty používají přihlášení pouze přes Google a cloudovou synchronizaci v Supabase. Google aplikace má publikum External a stav In production; Google a výslovné propojení identit jsou povolené v Supabase. Přepínače jsou `googleEnabled: true`, `manualLinkingEnabled: true` a `emailEnabled: false`. GitHub poskytuje hosting webu; přihlášení přes GitHub je vypnuté. Místní Šuplík, hledání a ruční přenos fungují také bez účtu. Nastavení backendu popisuje [backend/README.md](backend/README.md); výsledky konkrétního nasazení a přihlášení se evidují samostatně.
+<p align="center">
+  Česká webová aplikace pro objevování filmů a seriálů, správu vlastní sbírky<br>
+  a výběr programu na večer. Od telefonu až po velkou obrazovku.
+</p>
 
-## Nasazení
+<p align="center">
+  <a href="https://sledovatko.github.io"><strong>Otevřít Sledovátko ↗</strong></a>
+  &nbsp; · &nbsp;
+  <a href="#co-sledovátko-umí">Funkce</a>
+  &nbsp; · &nbsp;
+  <a href="#vaše-sbírka-na-vašich-zařízeních">Vaše sbírka</a>
+  &nbsp; · &nbsp;
+  <a href="#pro-vývojáře">Pro vývojáře</a>
+</p>
+
+---
+
+## Váš přehled o tom, co stojí za zhlédnutí
+
+Sledovátko spojuje filmový katalog s osobním seznamem titulů. Najděte něco nového, uložte si to do **Šuplíku** a sledujte, co chcete vidět, co máte rozkoukané a co už jste dokončili. Když nevíte, co si pustit, vyberte si podle času, žánru nebo nálady.
+
+<p align="center">
+  <a href="https://sledovatko.github.io">
+    <img src="readme-preview.png" alt="Domovská stránka Sledovátka: výběr na večer, žánry a vodorovné řady filmových karet" width="100%">
+  </a>
+  <br>
+  <sub>Skutečný náhled aplikace. Nabídka titulů se průběžně mění.</sub>
+</p>
+
+## Co Sledovátko umí
+
+| Objevování | Osobní sbírka | Výběr na večer |
+| :--- | :--- | :--- |
+| Filmy i seriály, žánry, vyhledávání a filtry. | Šuplík se stavy **Chci vidět · Rozkoukané · Viděné**. | Doporučení podle dostupného času a vynechaných žánrů. |
+| Řady načítají další tituly při posouvání ke konci. | Vlastní hodnocení, poznámky, štítky a statistiky. | Výběr z uložených titulů nebo nového katalogu. |
+| Podobné tituly přímo z nabídky **…** na kartě. | Přehled sledovaných epizod a pokračování seriálů. | Hot or Not a program tří filmů pro filmový večer. |
+
+### Od plakátu k detailu
+
+Jedním klepnutím otevřete popis, hodnocení, stopáž, galerii záběrů a trailer. Tlačítkem **+** uložíte titul do Šuplíku; nabídka **…** zpřístupní další možnosti včetně podobných filmů a seriálů. Akce detailu zůstávají dostupné i při posouvání delšího obsahu.
+
+### Rozhraní, které dává prostor filmům
+
+Tmavé plochy, průsvitné ovladače a zlaté akcenty doplňují filmové plakáty. Rozložení se přizpůsobuje mobilu, počítači i 4K obrazovce. Filmové řady lze procházet dotykem nebo šipkami; aplikace podporuje ovládání klávesnicí a respektuje systémové omezení pohybu.
+
+## Vaše sbírka na vašich zařízeních
+
+**Začněte bez účtu.** Hledání, místní Šuplík a ruční přenos fungují bez přihlášení. Po přihlášení přes Google můžete používat cloudovou synchronizaci přes Supabase.
+
+| Způsob použití | Jak funguje |
+| :--- | :--- |
+| **Místní Šuplík** | Sbírka zůstává uložená v daném prohlížeči. |
+| **Účet Google** | Přihlášení a cloudová synchronizace sbírky mezi zařízeními. |
+| **Ruční přenos** | Odkaz, QR kód nebo soubor `.sledovatko` se snímkem sbírky. Před importem se zobrazí porovnání dat. |
+| **Instalace na plochu** | Aplikaci lze přidat na plochu. Offline je dostupný místní Šuplík a dříve načtené základní rozhraní; katalog, nové plakáty a přihlášení potřebují internet. |
+
+Přenosové odkazy a soubory mohou obsahovat vaše poznámky a hodnocení. Sdílejte je pouze se zamýšleným příjemcem.
+
+<p align="center">
+  <a href="https://sledovatko.github.io"><strong>Vybrat si další film ↗</strong></a>
+</p>
+
+---
+
+## Pro vývojáře
+
+Statická aplikace postavená na **HTML, CSS a JavaScriptu**, hostovaná přes **GitHub Pages**. Filmový katalog využívá TMDB; účty a synchronizaci zajišťuje Supabase. Základní frontend nevyžaduje instalaci balíčků ani vlastní aplikační server.
+
+```sh
+python -m http.server 8765
+```
+
+Místní náhled otevřete na [localhost:8765](http://localhost:8765). Konfiguraci účtů a backendu popisuje [technická dokumentace](backend/README.md).
+
+<details>
+<summary><strong>Nasazení na GitHub Pages</strong></summary>
 
 1. Na původních stránkách si nejprve ulož přenosový kód. Uchovej také původní verzi webu pro případ návratu.
 2. Nahraj zdroj do kořene repozitáře a zachovej strukturu včetně `js`, `css`, `icons`, manifestu, `sw.js`, `scripts` a `.github/workflows/pages.yml`. Poté nastav GitHub Settings → Pages → Source na GitHub Actions. Workflow při změně větve `main` přepočítá offline cache a nahraje jen veřejné soubory webu. Lze jej spustit také ručně v Actions. Podrobnosti a alternativa publikování z větve jsou v [backend/README.md](backend/README.md).
 3. Ponech současnou doménu a HTTPS. Šuplík je uložený v prohlížeči pro konkrétní doménu; jiná doména nebo jiný prohlížeč vyžaduje ruční přenos.
 4. Po zveřejnění obnov stránku a zkontroluj svůj Šuplík. Stávající data `wm_*` se převedou automaticky; původní přenosové kódy jsou nadále podporované.
 
-## Funkce
+</details>
 
-- Tmavý zlatý liquid glass vzhled, průsvitné ovladače, pružné reakce na stisk, animované přechody a respektování systémového omezení pohybu v běžném rozhraní.
-- Mobilní hledání i Šuplík používají tři karty vedle sebe při šířce od 320 px. Hledání má filtry ve spodním panelu s tlačítkem Použít, aktivní filtry a samostatné řazení. Na větších obrazovkách se počet sloupců přizpůsobuje prostoru.
-- Jedno klepnutí na plakát otevírá detail. Samostatné skleněné + ukládá, … otevírá možnosti. Po odebrání lze změnu vrátit. Akce detailu jsou dostupné dole i při procházení dlouhého popisu nebo epizod.
-- Dotykové ovládání rozlišuje klepnutí, posouvání a gesto více prsty. Při posouvání řady se neotevírá detail; na dotykovém zařízení se nespouští náhled určený pro najetí myší. Vodorovné řady se ovládají tažením, na počítači zůstávají dostupné šipky. Okrajová gesta obsluhuje samostatná dotyková vrstva; běžné posouvání uvnitř stránky zůstává nativní.
-- Hledání zpracuje vždy poslední dotaz, umí další stránky bez duplicit a hledá i podle původního názvu. Výchozí hledání ve filmech i seriálech používá dvě katalogová volání místo desítek volání přes mnoho stránek a jazyků.
-- Uložená hledání mají samostatné tlačítko odebrání. Klepnutí na název spustí hledání; křížek ho pouze odebere z uložených. Stejný výslovný stav používá i ovladač nad výsledky, takže opakované odebrání položku znovu neuloží.
-- Domovská stránka ukazuje rozkoukané seriály s dalším dílem, výběr na večer a katalog. Seriálové žánry používají skutečné seriálové výsledky.
-- Karty v Pokračovat ve sledování neobsahují + ani …; detail otevře klepnutí na plakát nebo název. Zachovávají postup a označení další epizody.
-- Vzhled tvoří černé sklo, stříbrné odlesky hran, zlaté gradienty a názvy přes tmavou spodní část plakátů. Plakáty a hodnocení vycházejí ze skutečného obsahu katalogu.
-- Mobilní hledání používá menší kruhové ovladače s větší neviditelnou plochou pro klepnutí. Tři tečky jsou v mobilním hledání na úrovni názvu u pravého okraje. Jejich dotyková plocha má 44 × 44 px a nepřekrývá plochu názvu.
-- Šuplík má vlastní hledání, stavy Chci vidět / Rozkoukané / Viděné, řazení a čistší nabídku dalších možností. Štítky mají jednu barevnou značku místo opakovaných ikon. Statistiky a seskupení podle roku jsou v nabídce Šuplíku; skryté štítky lze obnovit. Také seskupení podle roku zachovává na mobilu tři sloupce.
-- Výběr na večer nabízí uložené či nové filmy, pouze neviděné a 12 časových voleb: bez omezení nebo limit 30, 45, 60, 90, 120, 150, 180, 210, 240, 300 a 360 minut. Lze současně vynechat více žánrů. Vybraná omezení platí pro Šuplík i nový katalog; chybějící metadata se před doporučením doplňují v omezené frontě.
-- Galerie záběrů je v detailu před popisem. Výběr omezuje vizuálně podobné obrázky; záběr lze zvětšit klepnutím nebo klávesnicí. Zachované jsou i filmové plátno, Hot or Not a program tří filmů.
-- Escape a tlačítko Zpět zavírají otevřené detaily, filtry, trailer i galerii. Návrat mezi stránkami obnovuje hledání, filtry a pozici.
-- Film a seriál se stejným číselným ID již nesdílejí stav sledování, poznámky ani hodnocení.
+<details>
+<summary><strong>Architektura, účty a ověření změn</strong></summary>
 
-## Přenos mezi zařízeními
-
-Na domovské stránce použij ikonu dvou šipek. Přenos je ruční snímek současné sbírky, nikoli automatická cloudová synchronizace nebo přihlášení.
-
-- **Odeslat:** vytvoření komprimovaného odkazu, původního kódu nebo záložního souboru `.sledovatko`.
-- **QR:** generuje se přímo v prohlížeči a obsahuje skutečný přenosový odkaz. U rozsáhlejší sbírky použij odkaz či soubor. Odkaz z místního náhledu `localhost` na jiném telefonu nefunguje; z veřejné domény ano.
-- **Přijmout:** vložení odkazu/kódu nebo výběr souboru. Před importem se ukáže srovnání počtu titulů, epizod, poznámek a hodnocení.
-- **Doplnit:** přidá nové tituly a spojí viděné epizody. Současné místní poznámky a hodnocení mají při konfliktu přednost.
-- **Nahradit:** použije obsah přenosu místo místních dat; má samostatné potvrzení a možnost stáhnout současnou zálohu.
-
-Kód i odkaz obsahují poznámky a hodnocení, proto je předávej pouze zamýšlenému příjemci. Komprese není šifrování. Přístupový token TMDB se nepřenáší.
-
-## Struktura
+### Struktura
 
 `css/base.css` a `css/liquid.css` tvoří základ vzhledu a rozložení, `css/concept.css` a `css/effects.css` vizuální efekty. Poslední vrstva `css/usability.css` upravuje ovládání a mobilní mřížky; `css/account.css` pokrývá účty. `js/touch-controls.js` rozlišuje dotyková gesta a zabraňuje dvojímu aktivování karty. Další chování je rozděleno do souborů pro API, data, navigaci, hledání, domovskou stránku, Šuplík a přenos.
 
@@ -73,3 +125,15 @@ Importy nyní ověřují typy, URL obrázků, rozměry dat a identitu titulů. P
 Výsledky konkrétního nasazení a místní regresní testy eviduj samostatně mimo veřejný balíček. Testovací kopie se simulovaným přihlášením se nepublikují. Databázové testy a místní simulace samy nepotvrzují skutečný OAuth průchod, fyzický iPhone ani synchronizaci mezi zařízeními.
 
 Základní knihovny jsou přibalené: Supabase JS 2.116.0 a qrcode-generator 2.0.4, obě pod MIT licencí. Web nepoužívá plovoucí CDN verze.
+
+</details>
+
+---
+
+<p align="center">
+  <strong>SLEDOVÁTKO</strong><br>
+  <sub>Filmy a seriály na jednom místě.</sub><br><br>
+  <a href="LICENSE">MIT licence</a> ·
+  <a href="https://sledovatko.github.io/privacy.html">Soukromí</a> ·
+  <a href="https://sledovatko.github.io/terms.html">Podmínky používání</a>
+</p>
