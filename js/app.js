@@ -218,6 +218,7 @@ const App = {
             <div>Načítám filmy ze světa...</div>
           </div>
           <canvas id="bored-canvas" style="display:none"></canvas>
+          <div id="bored-status" class="bored-status" role="status" hidden></div>
         </div>
       </div>`;
 
@@ -252,29 +253,54 @@ const App = {
 
   _boredMovies: [],
 
-  async _loadBoredMovies() {
+  async _loadBoredMovies({ keepGrid = false } = {}) {
     const seq = this._boredSeq = (this._boredSeq || 0) + 1;
+    this._boredController?.abort();
+    const controller = this._boredController = new AbortController();
     const routeKey = this._routeKey;
     const opts = {...this._boredOpts};
-    document.getElementById('bored-loading').style.display = 'flex';
-    document.getElementById('bored-canvas').style.display = 'none';
-    if (this._boredGrid) { this._boredGrid.destroy(); this._boredGrid = null; }
-    try {
-      const movies = await API.getBoredMovies({ genreId: opts.genreId, decade: opts.decade });
-      if (seq !== this._boredSeq || routeKey !== this._routeKey) return;
+    const canvas = document.getElementById('bored-canvas'), loading = document.getElementById('bored-loading'), status = document.getElementById('bored-status');
+    if (!canvas || !loading || !status) return;
+    const wrap = canvas.parentElement;
+    const wanted = BoredGrid.capacity(wrap.clientWidth, wrap.clientHeight);
+    const current = () => seq === this._boredSeq && routeKey === this._routeKey && this.currentScreen === 'bored' && canvas.isConnected;
+    const requestMore = () => { if (routeKey === this._routeKey && this.currentScreen === 'bored' && canvas.isConnected) this._loadBoredMovies({ keepGrid: true }); };
+    this._boredGrid?.updateOpts({ onNeedMore: requestMore });
+    if (!keepGrid) {
+      loading.style.display = 'flex'; loading.innerHTML = '<div class="spinner"></div><div>Načítám filmy ze světa…</div>';
+      canvas.style.display = 'none'; status.hidden = true;
+      this._boredGrid?.destroy(); this._boredGrid = null;
+    }
+    let rendered = keepGrid ? this._boredMovies.length : 0;
+    const render = (movies, final = false) => {
+      if (!current()) return;
       this._boredMovies = movies;
-      const canvas = document.getElementById('bored-canvas');
-      if (!canvas || this.currentScreen !== 'bored') return;
-      canvas.hidden = false;
-      document.getElementById('bored-loading').style.display = 'none';
-      canvas.style.display = 'block';
-      this._boredGrid = new BoredGrid(canvas, movies, {
-        spotlightMode: opts.spotlightMode,
-        showHeatmap: opts.showHeatmap,
-        onSelect: (movie) => openMovieDetail(movie),
+      if (!movies.length) {
+        if (final) { loading.style.display = 'flex'; loading.innerHTML = '<div>Pro tento výběr nejsou dostupné filmy s plakátem. Zkus jiný žánr nebo období.</div>'; status.hidden = true; }
+        return;
+      }
+      if (!final && movies.length < Math.min(wanted, 80)) return;
+      if (!final && rendered && movies.length < Math.min(wanted, Math.ceil(rendered * 1.2))) return;
+      loading.style.display = 'none'; canvas.hidden = false; canvas.style.display = 'block';
+      if (this._boredGrid) this._boredGrid.setMovies(movies);
+      else this._boredGrid = new BoredGrid(canvas, movies, {
+        requestedCount: wanted,
+        onNeedMore: requestMore,
+        onSelect: movie => openMovieDetail(movie),
       });
+      // A resized existing grid must follow this request's route/sequence too.
+      this._boredGrid.updateOpts({ onNeedMore: requestMore });
+      rendered = movies.length;
+      status.hidden = final || movies.length >= wanted;
+      status.textContent = `Doplňuji filmovou mozaiku · ${movies.length} titulů`;
+    };
+    try {
+      const movies = await API.getBoredMovies({ genreId: opts.genreId, decade: opts.decade, count: wanted, signal: controller.signal, onProgress: movies => render(movies) });
+      render(movies, true);
     } catch(e) {
-      if (seq === this._boredSeq && routeKey === this._routeKey && document.getElementById('bored-loading')) document.getElementById('bored-loading').innerHTML = '<div style="text-align:center"><div style="font-size:48px">⚠️</div><div>Chyba při načítání</div></div>';
+      if (e.name === 'AbortError' || !current()) return;
+      if (rendered) { status.hidden = false; status.textContent = 'Další filmy se nepodařilo načíst. Zobrazené tituly můžeš dál procházet.'; }
+      else loading.innerHTML = '<div>Filmy se nepodařilo načíst. Zkus Novou sadu.</div>';
     }
   },
 

@@ -7,11 +7,15 @@
   const horizontalSelector = '.category__row,.gallery,.mood-chips,.labels-row,.cal-row';
   let gesture = null, lastTouch = 0, compatibilityTap = null;
   let multiTouch = false, standalone = false;
+  const edgeTouches = new Set();
+  let multiReleases = [];
   const displayMode = window.matchMedia?.('(display-mode: standalone)');
   const now = () => Date.now();
   const lastScroll = new WeakMap();
   const point = (list, id) => Array.from(list || []).find(t => t.identifier === id);
   const available = el => el?.isConnected && !el.closest('[inert]') && !el.disabled;
+  const editable = target => target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])');
+  const atEdge = touch => touch.clientX <= edgeWidth || touch.clientX >= window.innerWidth - edgeWidth;
 
   function scrollParent(target, axis) {
     for (let el = target; el && el !== document.body; el = el.parentElement) {
@@ -51,7 +55,17 @@
     if (!touch) return;
     compatibilityTap = { time: now(), x: touch.clientX, y: touch.clientY, card: canceled ? state?.card : null };
   }
-  function resetTouches() { reset(); multiTouch = false; }
+  function resetTouches() { reset(); multiTouch = false; edgeTouches.clear(); multiReleases = []; }
+  function retainTouchOrigins(event) {
+    const active = new Set(Array.from(event.touches || [], touch => touch.identifier));
+    for (const id of edgeTouches) if (!active.has(id)) edgeTouches.delete(id);
+  }
+  function rememberMultiRelease(event) {
+    for (const touch of Array.from(event.changedTouches || [])) {
+      multiReleases.push({ x: touch.clientX, y: touch.clientY, card: (touch.target || event.target)?.closest?.('.movie-card') });
+    }
+    if (multiReleases.length) compatibilityTap = { time: now(), releases: multiReleases.slice() };
+  }
   function updateDisplayMode() {
     standalone = displayMode?.matches === true || window.navigator?.standalone === true;
     document.documentElement.dataset.displayMode = standalone ? 'standalone' : 'browser';
@@ -61,8 +75,10 @@
   if (displayMode?.addEventListener) displayMode.addEventListener('change', updateDisplayMode);
   else displayMode?.addListener?.(updateDisplayMode);
   const appSurface = target => target === document.body || target === document.documentElement || target?.closest?.('#app,.modal-overlay');
-  function blockPinch(event) {
-    if (!standalone || (!multiTouch && !appSurface(event.target))) return false;
+  function blockMultiTouch(event) {
+    // Browser pinch stays native when every finger started away from an edge.
+    // Once an edge finger joins, keep ownership until every finger has lifted.
+    if (!multiTouch && !edgeTouches.size && !(standalone && appSurface(event.target))) return false;
     multiTouch = true;
     reset();
     if (event.cancelable) event.preventDefault();
@@ -72,7 +88,8 @@
   // Do not release the touch latch at gestureend: one finger can still be down.
   for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
     document.addEventListener(type, event => {
-      if (!standalone || !appSurface(event.target)) return;
+      if (!multiTouch && !edgeTouches.size && !(standalone && appSurface(event.target))) return;
+      if (edgeTouches.size) multiTouch = true;
       reset();
       if (event.cancelable) event.preventDefault();
     }, { capture: true, passive: false });
@@ -82,13 +99,20 @@
     lastTouch = now();
     compatibilityTap = null;
     document.documentElement.dataset.input = 'touch';
-    if ((multiTouch || event.touches.length > 1) && blockPinch(event)) return;
+    retainTouchOrigins(event);
+    // changedTouches may contain the second/third finger while touches[0]
+    // still points at the stationary finger in the middle of the screen.
+    for (const touch of Array.from(event.changedTouches || event.touches || [])) {
+      const target = touch.target || event.target;
+      if (atEdge(touch) && appSurface(target) && !target.closest?.('[inert]') && !editable(target)) edgeTouches.add(touch.identifier);
+    }
+    if ((multiTouch || event.touches.length > 1) && blockMultiTouch(event)) return;
     if (event.touches.length !== 1 || !event.target.closest) { reset(); return; }
     const target = event.target, surface = target.closest('#app,.modal-overlay');
-    if (!surface || target.closest('[inert]')) { reset(); return; }
+    if (!surface || target.closest('[inert]') || editable(target)) { reset(); return; }
     const touch = event.touches[0], card = target.closest('.movie-card');
     endHover(card);
-    const edge = touch.clientX <= edgeWidth || touch.clientX >= window.innerWidth - edgeWidth;
+    const edge = atEdge(touch);
     if (!edge && !card) { reset(); return; }
     const owned = edge && event.cancelable;
     if (owned) event.preventDefault();
@@ -107,7 +131,7 @@
   }, { capture: true, passive: false });
 
   document.addEventListener('touchmove', event => {
-    if ((multiTouch || event.touches.length > 1) && blockPinch(event)) return;
+    if ((multiTouch || event.touches.length > 1) && blockMultiTouch(event)) return;
     const state = gesture;
     if (!state) return;
     if (event.touches.length !== 1) { reset(); return; }
@@ -124,10 +148,10 @@
   }, { capture: true, passive: false });
 
   document.addEventListener('touchend', event => {
+    retainTouchOrigins(event);
     if (multiTouch) {
       if (event.cancelable) event.preventDefault();
-      const touch = event.changedTouches[0];
-      if (touch) compatibilityTap = { time: now(), x: touch.clientX, y: touch.clientY };
+      rememberMultiRelease(event);
       if (!event.touches.length) resetTouches();
       return;
     }
@@ -150,15 +174,18 @@
 
   document.addEventListener('click', event => {
     if (!compatibilityTap || !event.detail || event.pointerType && event.pointerType !== 'touch' || event.sourceCapabilities?.firesTouchEvents === false) return;
-    const sameCanceledCard = compatibilityTap.card && event.target.closest?.('.movie-card') === compatibilityTap.card;
-    if (now() - compatibilityTap.time < 750 && (sameCanceledCard || Math.hypot(event.clientX - compatibilityTap.x, event.clientY - compatibilityTap.y) < 25)) {
+    const releases = compatibilityTap.releases || [compatibilityTap];
+    const nearRelease = releases.some(release => release.card && event.target.closest?.('.movie-card') === release.card || Math.hypot(event.clientX - release.x, event.clientY - release.y) < 25);
+    if (now() - compatibilityTap.time < 750 && nearRelease) {
       event.preventDefault(); event.stopImmediatePropagation(); compatibilityTap = null;
     }
   }, true);
   document.addEventListener('touchcancel', event => {
-    if (gesture) rememberRelease(point(event.changedTouches, gesture.id) || gesture.lastPoint, gesture, true);
+    if (multiTouch) rememberMultiRelease(event);
+    else if (gesture) rememberRelease(point(event.changedTouches, gesture.id) || gesture.lastPoint, gesture, true);
     reset();
-    if (!event.touches.length) multiTouch = false;
+    retainTouchOrigins(event);
+    if (!event.touches.length) resetTouches();
   }, { capture: true, passive: true });
   document.addEventListener('scroll', event => {
     const target = event.target === document ? document.documentElement : event.target;
