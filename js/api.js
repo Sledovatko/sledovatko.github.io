@@ -179,6 +179,21 @@ const API = (() => {
 
     poster, backdrop, still,
 
+    async getHomePage(category, {mediaType='movie', genreId=null, page=1} = {}) {
+      const type = mediaType === 'tv' ? 'tv' : 'movie';
+      let endpoint;
+      if (genreId) endpoint = `/discover/${type}?with_genres=${encodeURIComponent(genreId)}&sort_by=popularity.desc`;
+      else if (type === 'tv') endpoint = {popular:'/tv/popular',rated:'/tv/top_rated',onair:'/tv/on_the_air',today:'/tv/airing_today'}[category];
+      else if (category === 'upcoming') {
+        const today = new Date().toISOString().slice(0,10), future = new Date();
+        future.setMonth(future.getMonth()+8);
+        endpoint = `/discover/movie?sort_by=popularity.desc&primary_release_date.gte=${today}&primary_release_date.lte=${future.toISOString().slice(0,10)}&vote_count.gte=0`;
+      } else endpoint = {popular:'/movie/popular',nowplaying:'/movie/now_playing?region=CZ',toprated:'/movie/top_rated'}[category];
+      if (!endpoint) throw new Error('Unknown home category');
+      const data = await get(endpoint + (endpoint.includes('?')?'&':'?') + 'language=cs-CZ&page=' + page);
+      return {items:(data.results||[]).map(j=>parseMovie(j,type)),hasMore:page<Math.min(data.total_pages||1,500)};
+    },
+
     async getPopular()    { return fetchMultiPage('/movie/popular', 1); },
     async getNowPlaying() { return fetchMultiPage('/movie/now_playing?region=CZ', 1); },
     async getTopRated()   { return fetchMultiPage('/movie/top_rated', 1); },

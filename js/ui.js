@@ -663,7 +663,7 @@ function bindCommentAutosave(overlay, movie, commentEl) {
   });
 }
 
-async function openMovieDetail(movie) {
+async function openMovieDetail(movie, opts = {}) {
   const isFav     = Storage.isFavorite(movie.imdbId);
   const isWatched = Storage.isWatched(movie.imdbId);
   const myRating  = Storage.getRating(movie.imdbId);
@@ -821,84 +821,47 @@ async function openMovieDetail(movie) {
   });
 
   const similarBtn = overlay.querySelector('#_btn-similar');
-  let _simPage = 1, _simLoading = false, _simHasMore = true, _simMovies = [];
-  const _renderSimilarGrid = (section) => {
-    const grid = section.querySelector('#_sim-grid');
-    if (!grid) return;
-    const frag = document.createDocumentFragment();
-    _simMovies.forEach((s, i) => {
-      if (i < (_simPage - 1) * 12) return; // already rendered
-      const w = document.createElement('div');
-      w.innerHTML = movieCard(s);
-      frag.appendChild(w.firstElementChild);
-    });
-    grid.appendChild(frag);
-    attachCardEvents(grid);
-  };
-
-  const _loadMoreSimilar = async (section) => {
-    if (_simLoading || !_simHasMore) return;
-    _simLoading = true;
-    const sentinel = section.querySelector('#_sim-sentinel');
-    if (sentinel) sentinel.innerHTML = '<div class="spinner" style="width:24px;height:24px;margin:8px auto;border-width:2px"></div>';
-    try {
-      // Pages 1 and 2 from recommendations+similar, page 3+ via discover with same genres
-      let batch = [];
-      if (_simPage <= 2) {
-        batch = await API.getSmartSimilar(movie.id, movie.genreIds || [], movie.mediaType || 'movie');
-        _simHasMore = false; // getSmartSimilar returns full list in one shot
-        const seen = new Set(_simMovies.map(m => m.imdbId));
-        batch = batch.filter(m => !seen.has(m.imdbId));
-      }
-      _simMovies = [..._simMovies, ...batch];
-      _simPage++;
-      const grid = section.querySelector('#_sim-grid');
-      if (grid) {
-        batch.forEach(s => {
-          const w = document.createElement('div');
-          w.innerHTML = movieCard(s);
-          if (w.firstElementChild) grid.appendChild(w.firstElementChild);
-        });
-        attachCardEvents(grid);
-      }
-    } catch {}
-    _simLoading = false;
-    if (sentinel) sentinel.innerHTML = _simHasMore ? '' : '';
-    if (!_simHasMore && sentinel) sentinel.remove();
-  };
-
-  similarBtn.addEventListener('click', async () => {
+  const toggleSimilar = async () => {
     const existingSection = overlay.querySelector('#_similar-section');
     if (existingSection) {
       existingSection.remove();
       similarBtn.textContent = '✨ Podobné';
-      _simPage = 1; _simLoading = false; _simHasMore = true; _simMovies = [];
       return;
     }
-    similarBtn.textContent = '⏳...'; similarBtn.disabled = true;
+    const section = document.createElement('div');
+    section.id = '_similar-section';
+    section.className = 'detail-section';
+    section.innerHTML = `<h3>${movie.mediaType === 'tv' ? 'Podobné seriály' : 'Podobné filmy'}</h3>
+      <div id="_sim-grid" class="movie-grid similar-grid"></div>
+      <p class="similar-status" role="status">Načítám podobné tituly…</p>`;
+    overlay.querySelector('.detail-body').appendChild(section);
+    similarBtn.textContent = '⏳...';
+    similarBtn.disabled = true;
+    const scrollToSimilar = () => {
+      if (overlay.isConnected && opts.showSimilar) section.scrollIntoView({ block: 'start', behavior: 'instant' });
+    };
+    scrollToSimilar();
     try {
-      const section = document.createElement('div');
-      section.id = '_similar-section'; section.className = 'detail-section';
-      section.style.paddingBottom = '20px';
-      section.innerHTML = `<h3>Podobné filmy</h3>
-        <div id="_sim-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:14px 12px;padding:6px 0 4px"></div>
-        <div id="_sim-sentinel" style="height:32px;margin-top:4px"></div>`;
-      overlay.querySelector('.detail-body').appendChild(section);
-      await _loadMoreSimilar(section);
-      // Observe sentinel for scroll-based loading
-      const sentinel = section.querySelector('#_sim-sentinel');
-      if (sentinel) {
-        const modalBody = overlay.querySelector('.modal-body');
-        const obs = new IntersectionObserver(entries => {
-          if (entries[0].isIntersecting) _loadMoreSimilar(section);
-        }, { root: modalBody, rootMargin: '80px' });
-        obs.observe(sentinel);
-        section._simObs = obs;
-      }
+      const movies = await API.getSmartSimilar(movie.id, movie.genreIds || [], movie.mediaType || 'movie');
+      if (!overlay.isConnected) return;
+      const grid = section.querySelector('#_sim-grid');
+      grid.innerHTML = movies.map(m => movieCard(m)).join('');
+      attachCardEvents(grid);
+      const status = section.querySelector('.similar-status');
+      if (movies.length) status.remove();
+      else status.textContent = 'Žádné podobné tituly jsme nenašli.';
       similarBtn.textContent = '✨ Skrýt';
-    } catch (err) { showToast('Nepodařilo se načíst podobné filmy'); }
-    finally { similarBtn.disabled = false; }
-  });
+      scrollToSimilar();
+    } catch {
+      section.remove();
+      similarBtn.textContent = '✨ Podobné';
+      showToast('Nepodařilo se načíst podobné filmy. Zkus to znovu.');
+    } finally {
+      similarBtn.disabled = false;
+    }
+  };
+  similarBtn.addEventListener('click', toggleSimilar);
+  if (opts.showSimilar) void toggleSimilar();
 
   const ratingWrap = overlay.querySelector('#_rating-btns');
   const clearBtn   = overlay.querySelector('#_clear-rating');

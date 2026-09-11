@@ -46,11 +46,12 @@ Object.assign(App, {
   },
   _showCtxMenu(event,movie){
     const saved=Storage.isFavorite(movie.imdbId),defs=getAllLabelDefs();
-    const modal=showModal(`<div class="action-list"><button data-card-option="detail">Otevřít detail</button><button data-card-option="save">${saved?'Odebrat ze Šuplíku':'Uložit do Šuplíku'}</button><button data-card-option="watched">${movie.mediaType==='tv'?'Spravovat epizody':Storage.isWatched(movie.imdbId)?'Označit jako neviděné':'Označit jako viděné'}</button><button data-card-option="music">Soundtrack na YouTube ↗</button></div>
+    const modal=showModal(`<div class="action-list"><button data-card-option="detail">Otevřít detail</button><button data-card-option="similar">${movie.mediaType==='tv'?'Podobné seriály':'Podobné filmy'}</button><button data-card-option="save">${saved?'Odebrat ze Šuplíku':'Uložit do Šuplíku'}</button><button data-card-option="watched">${movie.mediaType==='tv'?'Spravovat epizody':Storage.isWatched(movie.imdbId)?'Označit jako neviděné':'Označit jako viděné'}</button><button data-card-option="music">Soundtrack na YouTube ↗</button></div>
       ${saved?`<label class="label-select">Štítek<select id="card-label"><option value="">Bez štítku</option>${Object.entries(defs).map(([id,d])=>`<option value="${escHtml(id)}" ${Storage.getLabels()[movie.imdbId]===id?'selected':''}>${escHtml(d.label)}</option>`).join('')}</select></label>`:''}`,{title:movie.title});
     modal.classList.add('sheet-overlay');
     modal.querySelectorAll('[data-card-option]').forEach(b=>b.onclick=()=>{
       const action=b.dataset.cardOption;
+      if(action==='similar'){openMovieDetail(movie,{showSimilar:true});return;}
       if(action==='detail'){openMovieDetail(movie);return;}
       if(action==='save'){
         if(Storage.isFavorite(movie.imdbId))removeFavoriteWithUndo(movie);

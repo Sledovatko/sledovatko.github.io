@@ -84,6 +84,45 @@ function createTonightPicker({api=API,storage=Storage,random=Math.random,today=(
   };
 }
 
+// Fetch the next page only when the end of this horizontal row approaches.
+function attachHomePagination(slot, initial, loadPage) {
+  const row = slot.querySelector('.category__row');
+  if (!row || !initial.hasMore) return;
+  let page=1, loading=false, hasMore=true, failed=false;
+  const seen=new Set(initial.items.map(m=>m.imdbId));
+  const more=document.createElement('button');
+  more.type='button';more.className='category-load-more btn btn--ghost';
+  more.textContent='Další tituly';row.appendChild(more);
+  const load=async()=>{
+    if(loading||!hasMore||!row.isConnected)return;
+    loading=true;failed=false;more.disabled=true;more.textContent='Načítám…';
+    try {
+      const result=await loadPage(page+1);
+      if(!row.isConnected)return;
+      page++;hasMore=result.hasMore;
+      const fresh=result.items.filter(m=>{if(seen.has(m.imdbId))return false;seen.add(m.imdbId);return true;});
+      more.insertAdjacentHTML('beforebegin',fresh.map(m=>movieCard(m)).join(''));
+      more.textContent='Další tituly';
+      if(!hasMore){more.remove();observer.disconnect();}
+      row.dispatchEvent(new Event('scroll'));
+    }catch{failed=true;more.textContent='Zkusit znovu';}
+    finally{
+      loading=false;more.disabled=false;
+      // Recheck after short/duplicate pages, without retrying errors in a loop.
+      if(hasMore&&!failed&&row.isConnected){observer.unobserve(more);observer.observe(more);}
+    }
+  };
+  more.onclick=load;
+  const observer=new IntersectionObserver(entries=>{
+    if(entries.some(e=>e.isIntersecting)&&!failed)void load();
+  },{root:row,rootMargin:'0px 600px 0px 0px'});
+  observer.observe(more);
+  const removed=new MutationObserver(()=>{
+    if(!row.isConnected){observer.disconnect();removed.disconnect();}
+  });
+  removed.observe(document.getElementById('screen'),{childList:true,subtree:true});
+}
+
 Object.assign(App, {
   async renderHome(){
     const state=this._homeState,s=document.getElementById('screen');
@@ -151,17 +190,19 @@ Object.assign(App, {
       chips.innerHTML=[{id:0,name:'Vše'},...genres].map(g=>`<button class="mood-chip ${(+state.genreId||0)===g.id?'active':''}" aria-pressed="${(+state.genreId||0)===g.id}" data-genre="${g.id}">${escHtml(g.name)}</button>`).join('');
       chips.onclick=e=>{const b=e.target.closest('[data-genre]');if(!b)return;this._homeState.genreId=+b.dataset.genre||null;this._loadMainCategories();};
       const sections=state.genreId
-        ?[['genre',genres.find(g=>g.id===+state.genreId)?.name||'Žánr',()=>API.getByGenre(state.genreId,1,state.mediaType)]]
+        ?[['genre',genres.find(g=>g.id===+state.genreId)?.name||'Žánr']]
         :state.mediaType==='tv'
-          ?[['popular','Populární seriály',()=>API.getTVPopular()],['rated','Nejlépe hodnocené',()=>API.getTVTopRated()],['onair','Právě vysílané',()=>API.getTVOnAir()],['today','Dnes na programu',()=>API.getTVAiringToday()]]
-          :[['popular','Populární',()=>API.getPopular()],['nowplaying','Právě v kinech',()=>API.getNowPlaying()],['toprated','Top hodnocené',()=>API.getTopRated()],['upcoming','Nadcházející',()=>API.getUpcoming()]];
+          ?[['popular','Populární seriály'],['rated','Nejlépe hodnocené'],['onair','Právě vysílané'],['today','Dnes na programu']]
+          :[['popular','Populární'],['nowplaying','Právě v kinech'],['toprated','Top hodnocené'],['upcoming','Nadcházející']];
       main.innerHTML=sections.map(([id])=>`<div id="home-${id}" class="home-category-slot">${spinner('Načítám…')}</div>`).join('');
-      await Promise.all(sections.map(async ([id,title,load])=>{
+      await Promise.all(sections.map(async ([id,title])=>{
         const slot=main.querySelector('#home-'+id);
         try{
-          const movies=await load();if(seq!==this._homeSeq||!slot.isConnected)return;
+          const loadPage=page=>API.getHomePage(id,{...state,page});
+          const initial=await loadPage(1),movies=[...new Map(initial.items.map(m=>[m.imdbId,m])).values()];if(seq!==this._homeSeq||!slot.isConnected)return;
           slot.innerHTML=movies.length?buildCategoryRow(state.mediaType+'-'+id,title,movies,{accentColor:'var(--text)',collapsible:true,sectionKey:state.mediaType+'-'+id}):`<div class="inline-notice">${escHtml(title)}: zatím bez titulů.</div>`;
           attachCategoryEvents('home-'+id);
+          attachHomePagination(slot,initial,loadPage);
         }catch{if(seq!==this._homeSeq||!slot.isConnected)return;slot.innerHTML=`<div class="inline-notice">${escHtml(title)} se nepodařilo načíst. <button class="btn btn--ghost">Zkusit znovu</button></div>`;slot.querySelector('button').onclick=()=>this._loadMainCategories();}
       }));
     }catch{
