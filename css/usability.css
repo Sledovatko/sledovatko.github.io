@@ -176,3 +176,35 @@ body [contenteditable]:not([contenteditable=false]) *{
 .library-guide__note>span{display:block;margin-top:4px}
 .library-guide__dismiss{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);padding:8px 12px;border-radius:20px;background:rgba(5,9,12,.92);text-align:center;font-size:13px;color:#e2dfd5;letter-spacing:.3px}
 @media(max-width:699px){.library-guide__note{font-size:13px}.library-guide__note strong{font-size:17px}.library-guide__dismiss{bottom:18px}}
+
+/* Quiet glass controls: one material across navigation, menus and filters. */
+:root{--control-glass:linear-gradient(145deg,#ffffff24,#ffffff08 48%,#ffc23314),#141416a8;--control-edge:#eee3c83d;--control-shadow:inset 0 1px 0 #fff3,0 4px 16px #0003;--control-ease:cubic-bezier(.2,.7,.25,1)}
+[data-theme=light]{--control-glass:linear-gradient(145deg,#ffffffdc,#fff9 48%,#ffdfa64a);--control-edge:#79613a45;--control-shadow:inset 0 1px 0 #fff,0 4px 16px #61533c16}
+:is(.category__arrow,.gallery-arrow,.modal-close,.detail-close){background:var(--control-glass);border:1px solid var(--control-edge);box-shadow:var(--control-shadow);color:var(--text);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);transition:opacity .3s ease,transform .3s var(--control-ease),border-color .3s ease,box-shadow .3s ease,color .3s ease}
+.gallery-arrow{width:44px;height:44px;font-size:22px}
+.modal-close{border-radius:50%;width:44px;height:44px}
+:is(.label-filter,.rating-btn,.category__see-all,.sort-inline-btn,.tonight-genre-chip){background:var(--control-glass);border:1px solid var(--control-edge);box-shadow:inset 0 1px 0 #ffffff14;transition:color .25s ease,border-color .25s ease,box-shadow .3s ease,transform .3s var(--control-ease)}
+.category__see-all{border-radius:20px;min-height:36px;padding:5px 14px}
+.rating-btn{border-radius:13px}
+:is(.label-filter.active,.rating-btn.active,.sort-inline-btn.active,.tonight-genre-chip:has(input:checked)){background:linear-gradient(145deg,#ffda7c35,#ffc23312);color:#ffe0a0;border-color:#dfb45499;box-shadow:inset 0 1px 0 #ffe5b540,0 3px 12px #ffc23310}
+.action-list button{background:linear-gradient(125deg,#ffffff08,#ffffff02);transition:color .25s ease,border-color .25s ease,box-shadow .3s ease}
+.action-list button.selected{background:linear-gradient(125deg,#ffc23324,#ffc23308);border-color:#dfb45470}
+.sort-select{border-radius:14px;box-shadow:inset 0 1px 0 #ffffff1c}
+.sort-select option{background:var(--surface);color:var(--text)}
+@media(hover:hover) and (pointer:fine){
+  :is(.category__arrow,.gallery-arrow,.modal-close,.detail-close):hover{background:var(--control-glass);color:var(--accent);border-color:#edc36b99;box-shadow:inset 0 1px 0 #ffe8b64d,0 5px 22px #0004,0 0 16px #ffc23318}
+  .category__arrow:hover{transform:translateY(-50%) scale(1.05)}
+  :is(.gallery-arrow,.modal-close):hover{transform:scale(1.05)}
+  :is(.label-filter,.rating-btn,.category__see-all,.sort-inline-btn,.tonight-genre-chip,.mood-chip):hover{border-color:#edc36b99;box-shadow:inset 0 1px 0 #ffe8b633,0 4px 16px #ffc23312}
+  .action-list button:hover{background:linear-gradient(125deg,#ffc23320,#ffc23306);border-color:#dfb45470}
+}
+:is(.category__arrow,.gallery-arrow,.modal-close,.detail-close):focus-visible{outline:2px solid var(--accent);outline-offset:3px;box-shadow:var(--control-shadow)}
+.category__arrow:active{transform:translateY(-50%) scale(.97)}
+.gallery-arrow:active{transform:scale(.97)}
+[data-theme=light] :is(.label-filter.active,.rating-btn.active,.sort-inline-btn.active,.tonight-genre-chip:has(input:checked)){color:#624204;border-color:#a8781b;background:linear-gradient(145deg,#ffe3a780,#ffc23322)}
+[data-theme=light] :is(.category__arrow,.gallery-arrow,.modal-close,.detail-close):hover{color:#76500b}
+@media(prefers-reduced-motion:reduce){
+  :is(.category__arrow,.gallery-arrow,.modal-close,.detail-close,.label-filter,.rating-btn,.category__see-all,.sort-inline-btn,.tonight-genre-chip,.action-list button){transition:none!important;animation:none!important}
+}
+/* Keep selected genre chips readable in the light palette, too. */
+[data-theme=light] .mood-chip.active{background:linear-gradient(145deg,#ffe7b3,#f0cc7d)!important;color:#503707;border-color:#b88c37;box-shadow:inset 0 1px 0 #fff8,0 3px 12px #aa7c1918}
