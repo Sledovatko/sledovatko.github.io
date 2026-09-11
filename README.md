@@ -45,7 +45,7 @@ Sledovátko spojuje filmový katalog s osobním seznamem titulů. Najděte něco
 
 ### Od plakátu k detailu
 
-Jedním klepnutím otevřete popis, hodnocení, stopáž, galerii záběrů a trailer. Tlačítkem **+** uložíte titul do Šuplíku; nabídka **…** zpřístupní další možnosti včetně podobných filmů a seriálů. Akce detailu zůstávají dostupné i při posouvání delšího obsahu.
+Jedním klepnutím otevřete popis, hodnocení, stopáž, galerii záběrů a trailer. Tlačítkem **+** uložíte titul do Šuplíku; nabídka **…** zpřístupní další možnosti včetně podobných filmů a seriálů. Akce detailu jsou přehledně umístěné nahoře, hned pod plakátem a základními informacemi o titulu.
 
 ### Rozhraní, které dává prostor filmům
 
